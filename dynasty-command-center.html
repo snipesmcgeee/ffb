@@ -214,9 +214,26 @@
     gap:6px;
   }
   .card .valline.na{color:var(--muted);}
-  .card .split-flag{
-    color:var(--alert);
+  .grade-badge{
     font-weight:700;
+    padding:0 4px;
+    border-radius:2px;
+  }
+  .grade-A{color:var(--good);}
+  .grade-B{color:var(--gold);}
+  .grade-C{color:var(--chalk);}
+  .grade-D{color:#D98A4A;}
+  .grade-F{color:var(--alert);}
+  .rank-badge{
+    color:var(--blue);
+    font-weight:700;
+    margin-left:6px;
+  }
+  .dp-weekly{
+    margin-top:2px;
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:10px;
+    color:var(--muted);
   }
   table{
     width:100%;
@@ -295,7 +312,7 @@
 </head>
 <body>
 
-<div class="version-tag">v0.1</div>
+<div class="version-tag">v0.2</div>
 
 <div class="scorebug">
   <div>
@@ -396,6 +413,21 @@ function projPoints(projEntry, isHalfPpr){
   return null;
 }
 
+// Absolute point-spread -> letter grade, per Jack's scale (max-min between the two sources)
+function gradeForDiff(diff){
+  const bands = [
+    [100,'A+'],[200,'A'],[300,'A-'],[400,'B+'],[500,'B'],[600,'B-'],
+    [700,'C+'],[800,'C'],[900,'C-'],[1000,'D+'],[1100,'D'],[1200,'D-']
+  ];
+  for(const [max, letter] of bands){
+    if(diff <= max) return letter;
+  }
+  return 'F';
+}
+function gradeClass(letter){
+  return 'grade-' + letter[0]; // grade-A, grade-B, ... grade-F
+}
+
 // Name normalization for matching DynastyProcess rows (keyed by name) to Sleeper players
 function normName(name){
   if(!name) return '';
@@ -415,7 +447,7 @@ async function fetchFantasyCalcSafe(numQbs){
     const map = {};
     (data || []).forEach(row => {
       const sid = row.player && row.player.sleeperId;
-      if(sid) map[sid] = { dynasty: row.value, redraft: row.redraftValue };
+      if(sid) map[sid] = { dynasty: row.value, redraft: row.redraftValue, posRank: row.positionRank };
     });
     return map;
   }catch(e){
@@ -432,12 +464,12 @@ async function fetchDynastyProcessSafe(numQbs){
     const text = await res.text();
     const parsed = Papa.parse(text, { header: true, dynamicTyping: true, skipEmptyLines: true });
     const valueField = numQbs >= 2 ? 'value_2qb' : 'value_1qb';
-    const map = {}; // normalized name -> dynasty value
+    const map = {}; // normalized name -> { value, posRank }
     parsed.data.forEach(row => {
       if(!row.player) return;
       const val = row[valueField];
       if(val == null) return;
-      map[normName(row.player)] = val;
+      map[normName(row.player)] = { value: val, posRank: row.ecr_pos };
     });
     return map;
   }catch(e){
@@ -446,8 +478,36 @@ async function fetchDynastyProcessSafe(numQbs){
   }
 }
 
-function buildValuesMap(playerMap, fcMap, dpNameMap){
-  // sleeper_id -> { fcDynasty, fcRedraft, dpDynasty }
+// DynastyProcess also republishes FantasyPros' weekly start/sit data (pos rank, letter
+// grade, projected points). Note: this only refreshes once the regular season is underway —
+// during the offseason/preseason it can be stale (last season's final week). We surface the
+// scrape date so that staleness is visible rather than hidden.
+async function fetchDynastyProcessWeeklySafe(){
+  try{
+    const url = 'https://raw.githubusercontent.com/DynastyProcess/data/master/files/fp_latest_weekly.csv';
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(`DP weekly returned ${res.status}`);
+    const text = await res.text();
+    const parsed = Papa.parse(text, { header: true, dynamicTyping: true, skipEmptyLines: true });
+    const map = {}; // normalized name -> { posRank, grade, pts, scrapeDate }
+    parsed.data.forEach(row => {
+      if(!row.player_name) return;
+      map[normName(row.player_name)] = {
+        posRank: row.pos_rank,
+        grade: row.start_sit_grade,
+        pts: row.r2p_pts,
+        scrapeDate: row.scrape_date
+      };
+    });
+    return map;
+  }catch(e){
+    console.error('DynastyProcess weekly fetch failed', e);
+    return null;
+  }
+}
+
+function buildValuesMap(playerMap, fcMap, dpNameMap, dpWeeklyMap){
+  // sleeper_id -> { fcDynasty, fcRedraft, fcPosRank, dpDynasty, dpPosRank, dpWeekly }
   const out = {};
   Object.keys(playerMap).forEach(id => {
     const p = playerMap[id];
@@ -456,17 +516,24 @@ function buildValuesMap(playerMap, fcMap, dpNameMap){
     if(fcMap && fcMap[id]){
       entry.fcDynasty = fcMap[id].dynasty;
       entry.fcRedraft = fcMap[id].redraft;
+      entry.fcPosRank = fcMap[id].posRank;
     }
-    if(dpNameMap){
-      const name = p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : p.full_name;
-      const dpVal = dpNameMap[normName(name)];
-      if(dpVal != null) entry.dpDynasty = dpVal;
+    const name = p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : p.full_name;
+    const key = normName(name);
+    if(dpNameMap && dpNameMap[key]){
+      entry.dpDynasty = dpNameMap[key].value;
+      entry.dpPosRank = dpNameMap[key].posRank;
+    }
+    if(dpWeeklyMap && dpWeeklyMap[key]){
+      entry.dpWeekly = dpWeeklyMap[key];
     }
     if(Object.keys(entry).length) out[id] = entry;
   });
   return out;
 }
 
+// Absolute point-spread between FC and DP dynasty values -> letter grade (Jack's scale).
+// Only computed when both sources have a number; a single-source player just shows the value.
 function dynastyBlend(entry){
   if(!entry) return null;
   const vals = [];
@@ -474,11 +541,22 @@ function dynastyBlend(entry){
   if(entry.dpDynasty != null) vals.push(entry.dpDynasty);
   if(!vals.length) return null;
   const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
-  let split = false;
+  let grade = null;
   if(vals.length === 2){
-    split = Math.abs(vals[0]-vals[1]) / avg > 0.20;
+    grade = gradeForDiff(Math.abs(vals[0]-vals[1]));
   }
-  return { avg, split, fc: entry.fcDynasty, dp: entry.dpDynasty };
+  return { avg, grade };
+}
+
+// Average positional rank across sources, e.g. FC RB1 + DP RB3 -> "RB2.0"
+function rankBadge(position, entry){
+  if(!entry) return null;
+  const ranks = [];
+  if(entry.fcPosRank != null) ranks.push(entry.fcPosRank);
+  if(entry.dpPosRank != null) ranks.push(entry.dpPosRank);
+  if(!ranks.length) return null;
+  const avg = ranks.reduce((a,b)=>a+b,0) / ranks.length;
+  return `${position}${avg.toFixed(1)}`;
 }
 
 function valueFor(id, filter, valuesMap, projMap, isHalfPpr){
@@ -500,13 +578,25 @@ function valueLineHtml(id, valuesMap, projMap, isHalfPpr, projLabel){
   const pts = projMap ? projPoints(projMap[id], isHalfPpr) : null;
 
   const dynastyStr = b
-    ? `Dyn: ${Math.round(b.avg)}${b.split ? ' <span class="split-flag">⚠ split</span>' : ''}`
+    ? `Dyn: ${Math.round(b.avg)}${b.grade ? ` <span class="grade-badge ${gradeClass(b.grade)}">${b.grade}</span>` : ''}`
     : `Dyn: —`;
   const seasonStr = (entry && entry.fcRedraft != null) ? `Ssn: ${Math.round(entry.fcRedraft)}` : `Ssn: —`;
   const weeklyStr = (pts != null) ? `${projLabel}: ${pts.toFixed(1)}` : `${projLabel}: —`;
 
   const naClass = (!b && !(entry && entry.fcRedraft != null) && pts == null) ? ' na' : '';
-  return `<div class="valline${naClass}">${dynastyStr} · ${seasonStr} · ${weeklyStr}</div>`;
+  let html = `<div class="valline${naClass}">${dynastyStr} · ${seasonStr} · ${weeklyStr}</div>`;
+
+  if(entry && entry.dpWeekly){
+    const w = entry.dpWeekly;
+    const parts = [];
+    if(w.posRank) parts.push(w.posRank);
+    if(w.grade) parts.push(`Grade ${w.grade}`);
+    if(w.pts != null) parts.push(`${w.pts} pts`);
+    if(parts.length){
+      html += `<div class="dp-weekly">FP (as of ${w.scrapeDate}): ${parts.join(' · ')}</div>`;
+    }
+  }
+  return html;
 }
 
 function posSort(a,b){
@@ -537,8 +627,10 @@ function renderRoster(roster, playerMap, valuesMap, projMap, isHalfPpr, projLabe
     const team = p.team || 'FA';
     const injury = p.injury_status ? `<div class="injury">${p.injury_status}</div>` : '';
     const starterTag = isStarter ? `<span class="starter-tag">STARTER</span>` : '';
+    const badge = rankBadge(p.position, valuesMap ? valuesMap[id] : null);
+    const badgeHtml = badge ? `<span class="rank-badge">${badge}</span>` : '';
     return `<div class="card ${cls}">
-      <div class="pos">${p.position || '-'} · ${team}${starterTag}</div>
+      <div class="pos">${p.position || '-'} · ${team}${badgeHtml}${starterTag}</div>
       <div class="pname">${name}</div>
       ${injury}
       ${valueLineHtml(id, valuesMap, projMap, isHalfPpr, projLabel)}
@@ -587,7 +679,7 @@ function renderFreeAgents(playerMap, rosteredIds, valuesMap, projMap, isHalfPpr,
     const pts = projMap ? projPoints(projMap[id], isHalfPpr) : null;
 
     const dynHtml = b
-      ? `<span class="val-val">${Math.round(b.avg)}${b.split ? ' <span class="split-flag">⚠</span>' : ''}</span>`
+      ? `<span class="val-val">${Math.round(b.avg)}${b.grade ? ` <span class="grade-badge ${gradeClass(b.grade)}">${b.grade}</span>` : ''}</span>`
       : `<span class="val-val na">—</span>`;
     const ssnHtml = (entry && entry.fcRedraft != null)
       ? `<span class="val-val">${Math.round(entry.fcRedraft)}</span>`
@@ -708,13 +800,14 @@ async function pullLatest(){
     const numQbs = qbSlots >= 2 ? 2 : 1;
 
     setStatus(`loading week ${currentWeek} projections + trade values...`);
-    const [projMap, fcMap, dpNameMap] = await Promise.all([
+    const [projMap, fcMap, dpNameMap, dpWeeklyMap] = await Promise.all([
       fetchProjectionsSafe(league.season, currentWeek),
       fetchFantasyCalcSafe(numQbs),
-      fetchDynastyProcessSafe(numQbs)
+      fetchDynastyProcessSafe(numQbs),
+      fetchDynastyProcessWeeklySafe()
     ]);
 
-    const valuesMap = buildValuesMap(playerMap, fcMap, dpNameMap);
+    const valuesMap = buildValuesMap(playerMap, fcMap, dpNameMap, dpWeeklyMap);
 
     // Header
     document.getElementById('leagueName').textContent = league.name || 'Dynasty Command Center';
@@ -741,6 +834,7 @@ async function pullLatest(){
     if(!projMap) warnings.push('weekly projections unavailable');
     if(!fcMap) warnings.push('FantasyCalc unavailable');
     if(!dpNameMap) warnings.push('DynastyProcess unavailable');
+    if(!dpWeeklyMap) warnings.push('DP weekly start/sit unavailable');
     setStatus(`updated ${new Date().toLocaleTimeString()}${warnings.length ? ' — ' + warnings.join(', ') : ''}`);
   }catch(err){
     console.error(err);
