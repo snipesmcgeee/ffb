@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Dynasty Command Center</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
   :root{
     --bg:#0B1210;
@@ -15,6 +16,7 @@
     --gold-dim:#8A7220;
     --alert:#C0483A;
     --good:#4C8B5E;
+    --blue:#3E7A9C;
   }
   *{box-sizing:border-box;}
   body{
@@ -24,10 +26,24 @@
     font-family:'Segoe UI',Arial,Helvetica,sans-serif;
     padding:0;
   }
+  .version-tag{
+    position:fixed;
+    top:8px;
+    left:8px;
+    z-index:50;
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:10px;
+    color:var(--muted);
+    background:var(--surface);
+    border:1px solid var(--line);
+    padding:2px 7px;
+    border-radius:3px;
+    letter-spacing:0.5px;
+  }
   .scorebug{
     background:var(--surface-raised);
     border-bottom:3px solid var(--gold);
-    padding:14px 20px;
+    padding:14px 20px 14px 70px;
     display:flex;
     align-items:center;
     justify-content:space-between;
@@ -118,9 +134,28 @@
     margin:22px 0 10px 0;
   }
   .section-label:first-child{margin-top:0;}
+  .value-filters{
+    display:flex;
+    gap:6px;
+    margin-bottom:18px;
+    flex-wrap:wrap;
+  }
+  .value-filter{
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--muted);
+    padding:6px 14px;
+    border-radius:20px;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    cursor:pointer;
+  }
+  .value-filter.active{background:var(--gold);color:#161200;border-color:var(--gold);}
   .roster-grid{
     display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
     gap:10px;
   }
   .card{
@@ -136,6 +171,18 @@
     font-size:10px;
     color:var(--gold);
     letter-spacing:1px;
+  }
+  .card .starter-tag{
+    display:inline-block;
+    margin-left:6px;
+    font-size:9px;
+    color:var(--bg);
+    background:var(--good);
+    padding:1px 5px;
+    border-radius:2px;
+    letter-spacing:0.5px;
+    font-weight:700;
+    vertical-align:middle;
   }
   .card .pname{
     font-size:14px;
@@ -157,58 +204,20 @@
     letter-spacing:0.5px;
     text-transform:uppercase;
   }
-  .card .proj{
+  .card .valline{
     margin-top:6px;
     font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
     font-size:11px;
     color:var(--good);
-  }
-  .card .proj.na{color:var(--muted);}
-  .card.fa{border-left-color:#3E7A9C;}
-  .fa-list{
     display:flex;
-    flex-direction:column;
-    gap:6px;
-  }
-  .fa-row{
-    display:grid;
-    grid-template-columns:50px 1fr 90px 70px;
     align-items:center;
-    background:var(--surface);
-    border:1px solid var(--line);
-    border-radius:3px;
-    padding:8px 12px;
-    font-size:13px;
-  }
-  .fa-row .pos-badge{
-    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
-    font-size:11px;
-    color:var(--gold);
-  }
-  .fa-row .proj-val{
-    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
-    color:var(--good);
-    text-align:right;
-  }
-  .fa-row .proj-val.na{color:var(--muted);}
-  .fa-filters{
-    display:flex;
     gap:6px;
-    margin-bottom:14px;
-    flex-wrap:wrap;
   }
-  .fa-filter{
-    background:var(--surface);
-    border:1px solid var(--line);
-    color:var(--muted);
-    padding:5px 12px;
-    border-radius:20px;
-    font-size:11px;
+  .card .valline.na{color:var(--muted);}
+  .card .split-flag{
+    color:var(--alert);
     font-weight:700;
-    letter-spacing:0.5px;
-    cursor:pointer;
   }
-  .fa-filter.active{background:var(--gold);color:#161200;border-color:var(--gold);}
   table{
     width:100%;
     border-collapse:collapse;
@@ -245,9 +254,48 @@
     margin:0 20px 16px 20px;
     font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
   }
+  .fa-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .fa-row{
+    display:grid;
+    grid-template-columns:50px 1fr 90px 90px 80px;
+    align-items:center;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:8px 12px;
+    font-size:13px;
+    gap:6px;
+  }
+  .fa-row .pos-badge{
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:11px;
+    color:var(--gold);
+  }
+  .fa-row .val-val{
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    color:var(--good);
+    text-align:right;
+    font-size:12px;
+  }
+  .fa-row .val-val.na{color:var(--muted);}
+  .fa-head{
+    display:grid;
+    grid-template-columns:50px 1fr 90px 90px 80px;
+    padding:0 12px 6px 12px;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--muted);
+  }
 </style>
 </head>
 <body>
+
+<div class="version-tag">v0.1</div>
 
 <div class="scorebug">
   <div>
@@ -286,7 +334,14 @@
 
 <script>
 const API = 'https://api.sleeper.app/v1';
-let players = null; // full player dict, fetched once per session
+const DP_VALUES_URL = 'https://raw.githubusercontent.com/DynastyProcess/data/master/files/values-players.csv';
+const FC_VALUES_URL = 'https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=1&numTeams=10&ppr=0.5';
+
+let players = null;       // full Sleeper player dict, fetched once per session
+let activeFilter = 'dynasty'; // 'dynasty' | 'season' | 'weekly'
+
+// Cache of last successful pull, so switching filters doesn't require a refetch
+let lastData = null; // { myRoster, league, rosters, usersById, playerMap, projMap, isHalfPpr, projLabel, valuesMap, currentWeek }
 
 document.querySelectorAll('.tab').forEach(t=>{
   t.addEventListener('click', ()=>{
@@ -309,11 +364,6 @@ async function getJSON(url){
   return res.json();
 }
 
-function posSort(a,b){
-  const order = {QB:0,RB:1,WR:2,TE:3,FLEX:4,SUPER_FLEX:4,K:5,DEF:6};
-  return (order[a]??9) - (order[b]??9);
-}
-
 async function loadPlayersOnce(){
   if(players) return players;
   setStatus('downloading player database (first time only, ~large file)...');
@@ -334,7 +384,7 @@ async function fetchProjectionsSafe(season, week){
       if(data && typeof data === 'object') return data;
     }catch(e){ /* try next */ }
   }
-  return null; // signals "unavailable" to callers
+  return null;
 }
 
 function projPoints(projEntry, isHalfPpr){
@@ -346,79 +396,216 @@ function projPoints(projEntry, isHalfPpr){
   return null;
 }
 
-function renderRoster(roster, rosterPositions, teamName, playerMap, projMap, isHalfPpr, projLabel){
-  const starterIds = roster.starters || [];
-  const allIds = roster.players || [];
-  const benchIds = allIds.filter(id => !starterIds.includes(id));
+// Name normalization for matching DynastyProcess rows (keyed by name) to Sleeper players
+function normName(name){
+  if(!name) return '';
+  return name.toLowerCase()
+    .replace(/[.']/g, '')
+    .replace(/\b(jr|sr|ii|iii|iv|v)\b/g, '')
+    .replace(/[^a-z ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-  function cardFor(id, benchClass){
+// FantasyCalc: public API, includes sleeperId directly — reliable join, no name matching needed.
+async function fetchFantasyCalcSafe(numQbs){
+  try{
+    const url = `https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=${numQbs}&numTeams=10&ppr=0.5`;
+    const data = await getJSON(url);
+    const map = {};
+    (data || []).forEach(row => {
+      const sid = row.player && row.player.sleeperId;
+      if(sid) map[sid] = { dynasty: row.value, redraft: row.redraftValue };
+    });
+    return map;
+  }catch(e){
+    console.error('FantasyCalc fetch failed', e);
+    return null;
+  }
+}
+
+// DynastyProcess: open-data CSV, keyed by player name — approximate match, fails soft per player.
+async function fetchDynastyProcessSafe(numQbs){
+  try{
+    const res = await fetch(DP_VALUES_URL);
+    if(!res.ok) throw new Error(`DP values returned ${res.status}`);
+    const text = await res.text();
+    const parsed = Papa.parse(text, { header: true, dynamicTyping: true, skipEmptyLines: true });
+    const valueField = numQbs >= 2 ? 'value_2qb' : 'value_1qb';
+    const map = {}; // normalized name -> dynasty value
+    parsed.data.forEach(row => {
+      if(!row.player) return;
+      const val = row[valueField];
+      if(val == null) return;
+      map[normName(row.player)] = val;
+    });
+    return map;
+  }catch(e){
+    console.error('DynastyProcess fetch failed', e);
+    return null;
+  }
+}
+
+function buildValuesMap(playerMap, fcMap, dpNameMap){
+  // sleeper_id -> { fcDynasty, fcRedraft, dpDynasty }
+  const out = {};
+  Object.keys(playerMap).forEach(id => {
     const p = playerMap[id];
-    if(!p) return `<div class="card ${benchClass}"><div class="pname">${id}</div><div class="sub">unknown player id</div></div>`;
+    if(!p || !p.position) return;
+    const entry = {};
+    if(fcMap && fcMap[id]){
+      entry.fcDynasty = fcMap[id].dynasty;
+      entry.fcRedraft = fcMap[id].redraft;
+    }
+    if(dpNameMap){
+      const name = p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : p.full_name;
+      const dpVal = dpNameMap[normName(name)];
+      if(dpVal != null) entry.dpDynasty = dpVal;
+    }
+    if(Object.keys(entry).length) out[id] = entry;
+  });
+  return out;
+}
+
+function dynastyBlend(entry){
+  if(!entry) return null;
+  const vals = [];
+  if(entry.fcDynasty != null) vals.push(entry.fcDynasty);
+  if(entry.dpDynasty != null) vals.push(entry.dpDynasty);
+  if(!vals.length) return null;
+  const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
+  let split = false;
+  if(vals.length === 2){
+    split = Math.abs(vals[0]-vals[1]) / avg > 0.20;
+  }
+  return { avg, split, fc: entry.fcDynasty, dp: entry.dpDynasty };
+}
+
+function valueFor(id, filter, valuesMap, projMap, isHalfPpr){
+  const entry = valuesMap ? valuesMap[id] : null;
+  if(filter === 'dynasty'){
+    const b = dynastyBlend(entry);
+    return b ? b.avg : null;
+  }
+  if(filter === 'season'){
+    return entry && entry.fcRedraft != null ? entry.fcRedraft : null;
+  }
+  // weekly
+  return projMap ? projPoints(projMap[id], isHalfPpr) : null;
+}
+
+function valueLineHtml(id, valuesMap, projMap, isHalfPpr, projLabel){
+  const entry = valuesMap ? valuesMap[id] : null;
+  const b = dynastyBlend(entry);
+  const pts = projMap ? projPoints(projMap[id], isHalfPpr) : null;
+
+  const dynastyStr = b
+    ? `Dyn: ${Math.round(b.avg)}${b.split ? ' <span class="split-flag">⚠ split</span>' : ''}`
+    : `Dyn: —`;
+  const seasonStr = (entry && entry.fcRedraft != null) ? `Ssn: ${Math.round(entry.fcRedraft)}` : `Ssn: —`;
+  const weeklyStr = (pts != null) ? `${projLabel}: ${pts.toFixed(1)}` : `${projLabel}: —`;
+
+  const naClass = (!b && !(entry && entry.fcRedraft != null) && pts == null) ? ' na' : '';
+  return `<div class="valline${naClass}">${dynastyStr} · ${seasonStr} · ${weeklyStr}</div>`;
+}
+
+function posSort(a,b){
+  const order = {QB:0,RB:1,WR:2,TE:3,K:4,DEF:5};
+  return (order[a]??9) - (order[b]??9);
+}
+
+function renderRoster(roster, playerMap, valuesMap, projMap, isHalfPpr, projLabel, filter){
+  const starterSet = new Set(roster.starters || []);
+  const allIds = roster.players || [];
+
+  const groups = {};
+  allIds.forEach(id => {
+    const p = playerMap[id];
+    const pos = (p && p.position) || 'OTHER';
+    if(!groups[pos]) groups[pos] = [];
+    groups[pos].push(id);
+  });
+
+  const sortedPositions = Object.keys(groups).sort(posSort);
+
+  function cardFor(id){
+    const p = playerMap[id];
+    const isStarter = starterSet.has(id);
+    const cls = isStarter ? '' : 'bench';
+    if(!p) return `<div class="card ${cls}"><div class="pname">${id}</div><div class="sub">unknown player id</div></div>`;
     const name = p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : (p.full_name || id);
-    const pos = p.position || '-';
     const team = p.team || 'FA';
     const injury = p.injury_status ? `<div class="injury">${p.injury_status}</div>` : '';
-    const pts = projMap ? projPoints(projMap[id], isHalfPpr) : null;
-    const proj = projMap
-      ? (pts != null
-          ? `<div class="proj">${projLabel}: ${pts.toFixed(1)} pts</div>`
-          : `<div class="proj na">${projLabel}: —</div>`)
-      : '';
-    return `<div class="card ${benchClass}">
-      <div class="pos">${pos} · ${team}</div>
+    const starterTag = isStarter ? `<span class="starter-tag">STARTER</span>` : '';
+    return `<div class="card ${cls}">
+      <div class="pos">${p.position || '-'} · ${team}${starterTag}</div>
       <div class="pname">${name}</div>
       ${injury}
-      ${proj}
+      ${valueLineHtml(id, valuesMap, projMap, isHalfPpr, projLabel)}
     </div>`;
   }
 
-  const starterCards = starterIds.map(id => cardFor(id, '')).join('');
-  const benchCards = benchIds.map(id => cardFor(id, 'bench')).join('');
+  const sections = sortedPositions.map(pos => {
+    const ids = groups[pos].slice().sort((a,b) => {
+      const va = valueFor(a, filter, valuesMap, projMap, isHalfPpr);
+      const vb = valueFor(b, filter, valuesMap, projMap, isHalfPpr);
+      if(va != null && vb != null) return vb - va;
+      if(va != null) return -1;
+      if(vb != null) return 1;
+      return 0;
+    });
+    const label = pos === 'DEF' ? 'DEFENSE' : (pos === 'OTHER' ? 'OTHER' : pos + 'S');
+    return `<div class="section-label">${label}</div>
+      <div class="roster-grid">${ids.map(cardFor).join('')}</div>`;
+  }).join('');
 
-  return `
-    <div class="section-label">Starting Lineup</div>
-    <div class="roster-grid">${starterCards || '<div class="empty">No starters set</div>'}</div>
-    <div class="section-label">Bench / Taxi / IR</div>
-    <div class="roster-grid">${benchCards || '<div class="empty">Nothing on the bench</div>'}</div>
-  `;
+  return sections || '<div class="empty">No players on this roster</div>';
 }
 
-function renderFreeAgents(playerMap, rosteredIds, projMap, isHalfPpr, projLabel){
+function renderFreeAgents(playerMap, rosteredIds, valuesMap, projMap, isHalfPpr, projLabel, filter){
   const positions = ['QB','RB','WR','TE','K','DEF'];
   const rows = Object.values(playerMap)
     .filter(p => p && p.position && positions.includes(p.position))
     .filter(p => p.status === 'Active' || p.position === 'DEF')
     .filter(p => !rosteredIds.has(p.player_id))
-    .map(p => {
-      const pts = projMap ? projPoints(projMap[p.player_id], isHalfPpr) : null;
-      return {p, pts};
-    })
+    .map(p => ({ p, val: valueFor(p.player_id, filter, valuesMap, projMap, isHalfPpr) }))
     .sort((a,b) => {
-      if(a.pts != null && b.pts != null) return b.pts - a.pts;
-      if(a.pts != null) return -1;
-      if(b.pts != null) return 1;
+      if(a.val != null && b.val != null) return b.val - a.val;
+      if(a.val != null) return -1;
+      if(b.val != null) return 1;
       return (a.p.search_rank||9999) - (b.p.search_rank||9999);
     })
     .slice(0, 60);
 
-  const rankNote = projMap
-    ? ''
-    : `<div class="status" style="margin-bottom:10px;">Live projections unavailable right now — sorted by Sleeper's overall player rank instead.</div>`;
+  const head = `<div class="fa-head"><span></span><span>Player</span><span style="text-align:right;">Dynasty</span><span style="text-align:right;">Season</span><span style="text-align:right;">${projLabel}</span></div>`;
 
-  const rowsHtml = rows.map(({p, pts}) => {
+  const rowsHtml = rows.map(({p}) => {
+    const id = p.player_id;
     const name = p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : p.full_name;
-    const ptsHtml = pts != null
-      ? `<span class="proj-val">${pts.toFixed(1)}</span>`
-      : `<span class="proj-val na">—</span>`;
+    const entry = valuesMap ? valuesMap[id] : null;
+    const b = dynastyBlend(entry);
+    const pts = projMap ? projPoints(projMap[id], isHalfPpr) : null;
+
+    const dynHtml = b
+      ? `<span class="val-val">${Math.round(b.avg)}${b.split ? ' <span class="split-flag">⚠</span>' : ''}</span>`
+      : `<span class="val-val na">—</span>`;
+    const ssnHtml = (entry && entry.fcRedraft != null)
+      ? `<span class="val-val">${Math.round(entry.fcRedraft)}</span>`
+      : `<span class="val-val na">—</span>`;
+    const wkHtml = (pts != null)
+      ? `<span class="val-val">${pts.toFixed(1)}</span>`
+      : `<span class="val-val na">—</span>`;
+
     return `<div class="fa-row">
       <span class="pos-badge">${p.position}</span>
       <span>${name} <span style="color:var(--muted);">· ${p.team || 'FA'}</span></span>
-      <span style="color:var(--muted);font-size:11px;">${projLabel}</span>
-      ${ptsHtml}
+      ${dynHtml}
+      ${ssnHtml}
+      ${wkHtml}
     </div>`;
   }).join('');
 
-  return `${rankNote}<div class="fa-list">${rowsHtml || '<div class="empty">No free agents found</div>'}</div>`;
+  return `${head}<div class="fa-list">${rowsHtml || '<div class="empty">No free agents found</div>'}</div>`;
 }
 
 function renderStandings(rosters, usersById, myRosterId){
@@ -443,6 +630,37 @@ function renderStandings(rosters, usersById, myRosterId){
     <thead><tr><th>Team</th><th>Manager</th><th>Record</th><th>Points For</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
+}
+
+function renderAll(){
+  if(!lastData) return;
+  const { myRoster, rosters, usersById, playerMap, projMap, isHalfPpr, projLabel, valuesMap, rosteredIds } = lastData;
+
+  document.getElementById('rosterContent').innerHTML =
+    `<div class="value-filters" id="valueFilters">
+      <div class="value-filter ${activeFilter==='dynasty'?'active':''}" data-filter="dynasty">Dynasty Value</div>
+      <div class="value-filter ${activeFilter==='season'?'active':''}" data-filter="season">Season Value</div>
+      <div class="value-filter ${activeFilter==='weekly'?'active':''}" data-filter="weekly">Weekly Value</div>
+    </div>` +
+    renderRoster(myRoster, playerMap, valuesMap, projMap, isHalfPpr, projLabel, activeFilter);
+
+  document.getElementById('standingsContent').innerHTML =
+    renderStandings(rosters, usersById, myRoster.roster_id);
+
+  document.getElementById('freeAgentsContent').innerHTML =
+    `<div class="value-filters" id="valueFiltersFA">
+      <div class="value-filter ${activeFilter==='dynasty'?'active':''}" data-filter="dynasty">Dynasty Value</div>
+      <div class="value-filter ${activeFilter==='season'?'active':''}" data-filter="season">Season Value</div>
+      <div class="value-filter ${activeFilter==='weekly'?'active':''}" data-filter="weekly">Weekly Value</div>
+    </div>` +
+    renderFreeAgents(playerMap, rosteredIds, valuesMap, projMap, isHalfPpr, projLabel, activeFilter);
+
+  document.querySelectorAll('.value-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeFilter = btn.dataset.filter;
+      renderAll();
+    });
+  });
 }
 
 async function pullLatest(){
@@ -480,16 +698,23 @@ async function pullLatest(){
 
     const playerMap = await loadPlayersOnce();
 
-    // Sleeper's state has both "week" (raw counter) and "display_week" (the
-    // week their own UI treats as current/upcoming) — these can differ.
-    // Use display_week directly; do NOT add +1, that double-counts.
+    // display_week is Sleeper's own "current/upcoming week" field — do not add +1 to it.
     const currentWeek = state.display_week || state.week || state.leg || 1;
-    const rec_ppr = league.scoring_settings && league.scoring_settings.rec;
-    const isHalfPpr = rec_ppr === 0.5;
-    const projLabel = `Wk ${currentWeek} proj`;
+    const recPpr = league.scoring_settings && league.scoring_settings.rec;
+    const isHalfPpr = recPpr === 0.5;
+    const projLabel = `Wk ${currentWeek}`;
 
-    setStatus(`loading week ${currentWeek} projections...`);
-    const projMap = await fetchProjectionsSafe(league.season, currentWeek);
+    const qbSlots = (league.roster_positions || []).filter(p => p === 'QB').length;
+    const numQbs = qbSlots >= 2 ? 2 : 1;
+
+    setStatus(`loading week ${currentWeek} projections + trade values...`);
+    const [projMap, fcMap, dpNameMap] = await Promise.all([
+      fetchProjectionsSafe(league.season, currentWeek),
+      fetchFantasyCalcSafe(numQbs),
+      fetchDynastyProcessSafe(numQbs)
+    ]);
+
+    const valuesMap = buildValuesMap(playerMap, fcMap, dpNameMap);
 
     // Header
     document.getElementById('leagueName').textContent = league.name || 'Dynasty Command Center';
@@ -502,26 +727,21 @@ async function pullLatest(){
     document.getElementById('teamStrip').innerHTML =
       `<span class="name">${myTeamName}</span><span class="record">${rec}</span>`;
 
-    // Roster panel
-    document.getElementById('rosterContent').innerHTML =
-      renderRoster(myRoster, league.roster_positions, myTeamName, playerMap, projMap, isHalfPpr, projLabel);
-
-    // Standings panel
-    document.getElementById('standingsContent').innerHTML =
-      renderStandings(rosters, usersById, myRoster.roster_id);
-
-    // Free agents panel — everyone rostered league-wide is excluded
     const rosteredIds = new Set();
     rosters.forEach(r => (r.players || []).forEach(id => rosteredIds.add(id)));
-    document.getElementById('freeAgentsContent').innerHTML =
-      renderFreeAgents(playerMap, rosteredIds, projMap, isHalfPpr, projLabel);
 
-    // persist last-good inputs so the dashboard remembers them
+    lastData = { myRoster, rosters, usersById, playerMap, projMap, isHalfPpr, projLabel, valuesMap, rosteredIds };
+    renderAll();
+
     try{
       await window.storage.set('last-inputs', JSON.stringify({username, leagueId}), false);
     }catch(e){ /* storage is best-effort */ }
 
-    setStatus(`updated ${new Date().toLocaleTimeString()}`);
+    const warnings = [];
+    if(!projMap) warnings.push('weekly projections unavailable');
+    if(!fcMap) warnings.push('FantasyCalc unavailable');
+    if(!dpNameMap) warnings.push('DynastyProcess unavailable');
+    setStatus(`updated ${new Date().toLocaleTimeString()}${warnings.length ? ' — ' + warnings.join(', ') : ''}`);
   }catch(err){
     console.error(err);
     showError(`Couldn't load data: ${err.message}. If this keeps happening, the Sleeper API may be unreachable from here — paste roster info manually instead and I'll work with that.`);
@@ -533,7 +753,6 @@ async function pullLatest(){
 
 document.getElementById('fetchBtn').addEventListener('click', pullLatest);
 
-// restore last-used inputs on open, then auto-pull
 (async function init(){
   try{
     const saved = await window.storage.get('last-inputs', false);
