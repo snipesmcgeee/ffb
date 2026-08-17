@@ -157,6 +157,58 @@
     letter-spacing:0.5px;
     text-transform:uppercase;
   }
+  .card .proj{
+    margin-top:6px;
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:11px;
+    color:var(--good);
+  }
+  .card .proj.na{color:var(--muted);}
+  .card.fa{border-left-color:#3E7A9C;}
+  .fa-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .fa-row{
+    display:grid;
+    grid-template-columns:50px 1fr 90px 70px;
+    align-items:center;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:8px 12px;
+    font-size:13px;
+  }
+  .fa-row .pos-badge{
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:11px;
+    color:var(--gold);
+  }
+  .fa-row .proj-val{
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    color:var(--good);
+    text-align:right;
+  }
+  .fa-row .proj-val.na{color:var(--muted);}
+  .fa-filters{
+    display:flex;
+    gap:6px;
+    margin-bottom:14px;
+    flex-wrap:wrap;
+  }
+  .fa-filter{
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--muted);
+    padding:5px 12px;
+    border-radius:20px;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    cursor:pointer;
+  }
+  .fa-filter.active{background:var(--gold);color:#161200;border-color:var(--gold);}
   table{
     width:100%;
     border-collapse:collapse;
@@ -217,6 +269,7 @@
 <div class="tabs">
   <div class="tab active" data-tab="roster">My Roster</div>
   <div class="tab" data-tab="standings">League Standings</div>
+  <div class="tab" data-tab="freeagents">Free Agents</div>
 </div>
 
 <div class="panel active" id="panel-roster">
@@ -225,6 +278,10 @@
 
 <div class="panel" id="panel-standings">
   <div id="standingsContent"><div class="empty">No data yet — pull latest to load standings.</div></div>
+</div>
+
+<div class="panel" id="panel-freeagents">
+  <div id="freeAgentsContent"><div class="empty">No data yet — pull latest to load free agents.</div></div>
 </div>
 
 <script>
@@ -264,7 +321,32 @@ async function loadPlayersOnce(){
   return players;
 }
 
-function renderRoster(roster, rosterPositions, teamName, playerMap){
+// Sleeper's projections endpoint isn't in their official public docs anymore —
+// it's a community-known endpoint that may change or disappear. Fail soft.
+async function fetchProjectionsSafe(season, week){
+  const urls = [
+    `${API}/projections/nfl/regular/${season}/${week}`,
+    `https://api.sleeper.com/projections/nfl/${season}/${week}?season_type=regular`
+  ];
+  for(const url of urls){
+    try{
+      const data = await getJSON(url);
+      if(data && typeof data === 'object') return data;
+    }catch(e){ /* try next */ }
+  }
+  return null; // signals "unavailable" to callers
+}
+
+function projPoints(projEntry, isHalfPpr){
+  if(!projEntry) return null;
+  const stats = projEntry.stats || projEntry;
+  if(isHalfPpr && stats.pts_half_ppr != null) return stats.pts_half_ppr;
+  if(stats.pts_ppr != null) return stats.pts_ppr;
+  if(stats.pts_std != null) return stats.pts_std;
+  return null;
+}
+
+function renderRoster(roster, rosterPositions, teamName, playerMap, projMap, isHalfPpr, projLabel){
   const starterIds = roster.starters || [];
   const allIds = roster.players || [];
   const benchIds = allIds.filter(id => !starterIds.includes(id));
@@ -276,10 +358,17 @@ function renderRoster(roster, rosterPositions, teamName, playerMap){
     const pos = p.position || '-';
     const team = p.team || 'FA';
     const injury = p.injury_status ? `<div class="injury">${p.injury_status}</div>` : '';
+    const pts = projMap ? projPoints(projMap[id], isHalfPpr) : null;
+    const proj = projMap
+      ? (pts != null
+          ? `<div class="proj">${projLabel}: ${pts.toFixed(1)} pts</div>`
+          : `<div class="proj na">${projLabel}: —</div>`)
+      : '';
     return `<div class="card ${benchClass}">
       <div class="pos">${pos} · ${team}</div>
       <div class="pname">${name}</div>
       ${injury}
+      ${proj}
     </div>`;
   }
 
@@ -292,6 +381,44 @@ function renderRoster(roster, rosterPositions, teamName, playerMap){
     <div class="section-label">Bench / Taxi / IR</div>
     <div class="roster-grid">${benchCards || '<div class="empty">Nothing on the bench</div>'}</div>
   `;
+}
+
+function renderFreeAgents(playerMap, rosteredIds, projMap, isHalfPpr, projLabel){
+  const positions = ['QB','RB','WR','TE','K','DEF'];
+  const rows = Object.values(playerMap)
+    .filter(p => p && p.position && positions.includes(p.position))
+    .filter(p => p.status === 'Active' || p.position === 'DEF')
+    .filter(p => !rosteredIds.has(p.player_id))
+    .map(p => {
+      const pts = projMap ? projPoints(projMap[p.player_id], isHalfPpr) : null;
+      return {p, pts};
+    })
+    .sort((a,b) => {
+      if(a.pts != null && b.pts != null) return b.pts - a.pts;
+      if(a.pts != null) return -1;
+      if(b.pts != null) return 1;
+      return (a.p.search_rank||9999) - (b.p.search_rank||9999);
+    })
+    .slice(0, 60);
+
+  const rankNote = projMap
+    ? ''
+    : `<div class="status" style="margin-bottom:10px;">Live projections unavailable right now — sorted by Sleeper's overall player rank instead.</div>`;
+
+  const rowsHtml = rows.map(({p, pts}) => {
+    const name = p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : p.full_name;
+    const ptsHtml = pts != null
+      ? `<span class="proj-val">${pts.toFixed(1)}</span>`
+      : `<span class="proj-val na">—</span>`;
+    return `<div class="fa-row">
+      <span class="pos-badge">${p.position}</span>
+      <span>${name} <span style="color:var(--muted);">· ${p.team || 'FA'}</span></span>
+      <span style="color:var(--muted);font-size:11px;">${projLabel}</span>
+      ${ptsHtml}
+    </div>`;
+  }).join('');
+
+  return `${rankNote}<div class="fa-list">${rowsHtml || '<div class="empty">No free agents found</div>'}</div>`;
 }
 
 function renderStandings(rosters, usersById, myRosterId){
@@ -353,10 +480,20 @@ async function pullLatest(){
 
     const playerMap = await loadPlayersOnce();
 
+    // Figure out "next week" from Sleeper's NFL state, and whether this league is half-PPR
+    const currentWeek = state.week || state.leg || 1;
+    const nextWeek = currentWeek + 1;
+    const rec_ppr = league.scoring_settings && league.scoring_settings.rec;
+    const isHalfPpr = rec_ppr === 0.5;
+    const projLabel = `Wk ${nextWeek} proj`;
+
+    setStatus(`loading week ${nextWeek} projections...`);
+    const projMap = await fetchProjectionsSafe(league.season, nextWeek);
+
     // Header
     document.getElementById('leagueName').textContent = league.name || 'Dynasty Command Center';
     document.getElementById('leagueMeta').textContent =
-      `${league.season} season · ${state.season_type} · week ${state.leg || state.week || '-'} · ${league.total_rosters} teams`;
+      `${league.season} season · ${state.season_type} · week ${currentWeek} · ${league.total_rosters} teams`;
 
     const myUser = usersById[user.user_id] || {};
     const myTeamName = (myUser.metadata && myUser.metadata.team_name) || myUser.display_name || username;
@@ -366,11 +503,17 @@ async function pullLatest(){
 
     // Roster panel
     document.getElementById('rosterContent').innerHTML =
-      renderRoster(myRoster, league.roster_positions, myTeamName, playerMap);
+      renderRoster(myRoster, league.roster_positions, myTeamName, playerMap, projMap, isHalfPpr, projLabel);
 
     // Standings panel
     document.getElementById('standingsContent').innerHTML =
       renderStandings(rosters, usersById, myRoster.roster_id);
+
+    // Free agents panel — everyone rostered league-wide is excluded
+    const rosteredIds = new Set();
+    rosters.forEach(r => (r.players || []).forEach(id => rosteredIds.add(id)));
+    document.getElementById('freeAgentsContent').innerHTML =
+      renderFreeAgents(playerMap, rosteredIds, projMap, isHalfPpr, projLabel);
 
     // persist last-good inputs so the dashboard remembers them
     try{
