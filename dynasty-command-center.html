@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dynasty Command Center</title>
+<style>
+  :root{
+    --bg:#0B1210;
+    --surface:#121C18;
+    --surface-raised:#182620;
+    --line:#25352E;
+    --chalk:#EDEFEA;
+    --muted:#7E9089;
+    --gold:#C9A227;
+    --gold-dim:#8A7220;
+    --alert:#C0483A;
+    --good:#4C8B5E;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--chalk);
+    font-family:'Segoe UI',Arial,Helvetica,sans-serif;
+    padding:0;
+  }
+  .scorebug{
+    background:var(--surface-raised);
+    border-bottom:3px solid var(--gold);
+    padding:14px 20px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .scorebug .league-name{
+    font-weight:800;
+    font-stretch:condensed;
+    letter-spacing:0.5px;
+    font-size:20px;
+    text-transform:uppercase;
+  }
+  .scorebug .meta{
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:12px;
+    color:var(--muted);
+    letter-spacing:0.5px;
+  }
+  .team-strip{
+    display:flex;
+    gap:16px;
+    align-items:baseline;
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+  }
+  .team-strip .name{font-size:15px;font-weight:700;color:var(--gold);}
+  .team-strip .record{font-size:15px;color:var(--chalk);}
+  .controls{
+    padding:12px 20px;
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+    border-bottom:1px solid var(--line);
+  }
+  input[type=text]{
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--chalk);
+    padding:8px 10px;
+    border-radius:3px;
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:13px;
+  }
+  button{
+    background:var(--gold);
+    color:#161200;
+    border:none;
+    padding:8px 16px;
+    border-radius:3px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    font-size:12px;
+    cursor:pointer;
+  }
+  button:hover{background:#E0B735;}
+  button:disabled{background:var(--gold-dim);cursor:default;}
+  .status{
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:12px;
+    color:var(--muted);
+  }
+  .tabs{
+    display:flex;
+    border-bottom:1px solid var(--line);
+    padding:0 20px;
+  }
+  .tab{
+    padding:12px 18px;
+    font-size:13px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+    cursor:pointer;
+    border-bottom:3px solid transparent;
+  }
+  .tab.active{color:var(--chalk);border-bottom-color:var(--gold);}
+  .panel{display:none;padding:20px;}
+  .panel.active{display:block;}
+  .section-label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    color:var(--gold);
+    font-weight:700;
+    margin:22px 0 10px 0;
+  }
+  .section-label:first-child{margin-top:0;}
+  .roster-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:10px;
+  }
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-left:3px solid var(--gold);
+    border-radius:3px;
+    padding:10px 12px;
+  }
+  .card.bench{border-left-color:var(--muted);}
+  .card .pos{
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:10px;
+    color:var(--gold);
+    letter-spacing:1px;
+  }
+  .card .pname{
+    font-size:14px;
+    font-weight:700;
+    margin:2px 0;
+  }
+  .card .sub{
+    font-size:11px;
+    color:var(--muted);
+  }
+  .card .injury{
+    display:inline-block;
+    margin-top:4px;
+    font-size:10px;
+    background:var(--alert);
+    color:var(--chalk);
+    padding:2px 6px;
+    border-radius:2px;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:13px;
+  }
+  th,td{
+    text-align:left;
+    padding:8px 10px;
+    border-bottom:1px solid var(--line);
+  }
+  th{
+    color:var(--muted);
+    text-transform:uppercase;
+    font-size:11px;
+    letter-spacing:1px;
+    font-weight:600;
+  }
+  tr.me{background:rgba(201,162,39,0.08);}
+  tr.me td:first-child{color:var(--gold);font-weight:700;}
+  .empty{
+    color:var(--muted);
+    font-size:13px;
+    padding:30px 0;
+    text-align:center;
+  }
+  .error-box{
+    background:rgba(192,72,58,0.12);
+    border:1px solid var(--alert);
+    color:#E8998E;
+    padding:12px 14px;
+    border-radius:3px;
+    font-size:13px;
+    margin:0 20px 16px 20px;
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+  }
+</style>
+</head>
+<body>
+
+<div class="scorebug">
+  <div>
+    <div class="league-name" id="leagueName">Dynasty Command Center</div>
+    <div class="meta" id="leagueMeta">not loaded yet</div>
+  </div>
+  <div class="team-strip" id="teamStrip"></div>
+</div>
+
+<div class="controls">
+  <input type="text" id="usernameInput" value="jaheruth2412" placeholder="Sleeper username">
+  <input type="text" id="leagueIdInput" value="1328961362654691328" placeholder="League ID" style="width:220px;">
+  <button id="fetchBtn">Pull latest</button>
+  <span class="status" id="statusLine">enter your info and hit pull latest</span>
+</div>
+
+<div id="errorBox"></div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="roster">My Roster</div>
+  <div class="tab" data-tab="standings">League Standings</div>
+</div>
+
+<div class="panel active" id="panel-roster">
+  <div id="rosterContent"><div class="empty">No data yet — pull latest to load your roster.</div></div>
+</div>
+
+<div class="panel" id="panel-standings">
+  <div id="standingsContent"><div class="empty">No data yet — pull latest to load standings.</div></div>
+</div>
+
+<script>
+const API = 'https://api.sleeper.app/v1';
+let players = null; // full player dict, fetched once per session
+
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+function setStatus(msg){ document.getElementById('statusLine').textContent = msg; }
+function showError(msg){
+  document.getElementById('errorBox').innerHTML = msg
+    ? `<div class="error-box">${msg}</div>` : '';
+}
+
+async function getJSON(url){
+  const res = await fetch(url);
+  if(!res.ok) throw new Error(`${url} returned ${res.status}`);
+  return res.json();
+}
+
+function posSort(a,b){
+  const order = {QB:0,RB:1,WR:2,TE:3,FLEX:4,SUPER_FLEX:4,K:5,DEF:6};
+  return (order[a]??9) - (order[b]??9);
+}
+
+async function loadPlayersOnce(){
+  if(players) return players;
+  setStatus('downloading player database (first time only, ~large file)...');
+  players = await getJSON(`${API}/players/nfl`);
+  return players;
+}
+
+function renderRoster(roster, rosterPositions, teamName, playerMap){
+  const starterIds = roster.starters || [];
+  const allIds = roster.players || [];
+  const benchIds = allIds.filter(id => !starterIds.includes(id));
+
+  function cardFor(id, benchClass){
+    const p = playerMap[id];
+    if(!p) return `<div class="card ${benchClass}"><div class="pname">${id}</div><div class="sub">unknown player id</div></div>`;
+    const name = p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : (p.full_name || id);
+    const pos = p.position || '-';
+    const team = p.team || 'FA';
+    const injury = p.injury_status ? `<div class="injury">${p.injury_status}</div>` : '';
+    return `<div class="card ${benchClass}">
+      <div class="pos">${pos} · ${team}</div>
+      <div class="pname">${name}</div>
+      ${injury}
+    </div>`;
+  }
+
+  const starterCards = starterIds.map(id => cardFor(id, '')).join('');
+  const benchCards = benchIds.map(id => cardFor(id, 'bench')).join('');
+
+  return `
+    <div class="section-label">Starting Lineup</div>
+    <div class="roster-grid">${starterCards || '<div class="empty">No starters set</div>'}</div>
+    <div class="section-label">Bench / Taxi / IR</div>
+    <div class="roster-grid">${benchCards || '<div class="empty">Nothing on the bench</div>'}</div>
+  `;
+}
+
+function renderStandings(rosters, usersById, myRosterId){
+  const rows = rosters
+    .slice()
+    .sort((a,b) => (b.settings.wins - a.settings.wins) || ((b.settings.fpts||0) - (a.settings.fpts||0)))
+    .map(r => {
+      const u = usersById[r.owner_id] || {};
+      const teamName = (u.metadata && u.metadata.team_name) || u.display_name || 'Unknown';
+      const rec = `${r.settings.wins || 0}-${r.settings.losses || 0}${r.settings.ties ? '-'+r.settings.ties : ''}`;
+      const pf = (r.settings.fpts || 0) + (r.settings.fpts_decimal ? r.settings.fpts_decimal/100 : 0);
+      const rowClass = r.roster_id === myRosterId ? 'me' : '';
+      return `<tr class="${rowClass}">
+        <td>${teamName}</td>
+        <td>${u.display_name || ''}</td>
+        <td>${rec}</td>
+        <td>${pf.toFixed(1)}</td>
+      </tr>`;
+    }).join('');
+
+  return `<table>
+    <thead><tr><th>Team</th><th>Manager</th><th>Record</th><th>Points For</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+async function pullLatest(){
+  const username = document.getElementById('usernameInput').value.trim();
+  const leagueId = document.getElementById('leagueIdInput').value.trim();
+  const btn = document.getElementById('fetchBtn');
+  showError('');
+
+  if(!username || !leagueId){
+    showError('Enter both a username and a league ID.');
+    return;
+  }
+
+  btn.disabled = true;
+  try{
+    setStatus('looking up user...');
+    const user = await getJSON(`${API}/user/${username}`);
+    if(!user || !user.user_id) throw new Error('User not found on Sleeper.');
+
+    setStatus('loading league...');
+    const league = await getJSON(`${API}/league/${leagueId}`);
+
+    setStatus('loading rosters and managers...');
+    const [rosters, usersArr, state] = await Promise.all([
+      getJSON(`${API}/league/${leagueId}/rosters`),
+      getJSON(`${API}/league/${leagueId}/users`),
+      getJSON(`${API}/state/nfl`)
+    ]);
+
+    const usersById = {};
+    usersArr.forEach(u => usersById[u.user_id] = u);
+
+    const myRoster = rosters.find(r => r.owner_id === user.user_id);
+    if(!myRoster) throw new Error('Could not find a roster owned by this username in this league.');
+
+    const playerMap = await loadPlayersOnce();
+
+    // Header
+    document.getElementById('leagueName').textContent = league.name || 'Dynasty Command Center';
+    document.getElementById('leagueMeta').textContent =
+      `${league.season} season · ${state.season_type} · week ${state.leg || state.week || '-'} · ${league.total_rosters} teams`;
+
+    const myUser = usersById[user.user_id] || {};
+    const myTeamName = (myUser.metadata && myUser.metadata.team_name) || myUser.display_name || username;
+    const rec = `${myRoster.settings.wins || 0}-${myRoster.settings.losses || 0}`;
+    document.getElementById('teamStrip').innerHTML =
+      `<span class="name">${myTeamName}</span><span class="record">${rec}</span>`;
+
+    // Roster panel
+    document.getElementById('rosterContent').innerHTML =
+      renderRoster(myRoster, league.roster_positions, myTeamName, playerMap);
+
+    // Standings panel
+    document.getElementById('standingsContent').innerHTML =
+      renderStandings(rosters, usersById, myRoster.roster_id);
+
+    // persist last-good inputs so the dashboard remembers them
+    try{
+      await window.storage.set('last-inputs', JSON.stringify({username, leagueId}), false);
+    }catch(e){ /* storage is best-effort */ }
+
+    setStatus(`updated ${new Date().toLocaleTimeString()}`);
+  }catch(err){
+    console.error(err);
+    showError(`Couldn't load data: ${err.message}. If this keeps happening, the Sleeper API may be unreachable from here — paste roster info manually instead and I'll work with that.`);
+    setStatus('load failed');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('fetchBtn').addEventListener('click', pullLatest);
+
+// restore last-used inputs on open, then auto-pull
+(async function init(){
+  try{
+    const saved = await window.storage.get('last-inputs', false);
+    if(saved && saved.value){
+      const {username, leagueId} = JSON.parse(saved.value);
+      if(username) document.getElementById('usernameInput').value = username;
+      if(leagueId) document.getElementById('leagueIdInput').value = leagueId;
+    }
+  }catch(e){ /* no saved state yet, fine */ }
+  pullLatest();
+})();
+</script>
+</body>
+</html>
