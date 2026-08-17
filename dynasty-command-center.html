@@ -480,15 +480,16 @@ async function pullLatest(){
 
     const playerMap = await loadPlayersOnce();
 
-    // Figure out "next week" from Sleeper's NFL state, and whether this league is half-PPR
-    const currentWeek = state.week || state.leg || 1;
-    const nextWeek = currentWeek + 1;
+    // Sleeper's state has both "week" (raw counter) and "display_week" (the
+    // week their own UI treats as current/upcoming) — these can differ.
+    // Use display_week directly; do NOT add +1, that double-counts.
+    const currentWeek = state.display_week || state.week || state.leg || 1;
     const rec_ppr = league.scoring_settings && league.scoring_settings.rec;
     const isHalfPpr = rec_ppr === 0.5;
-    const projLabel = `Wk ${nextWeek} proj`;
+    const projLabel = `Wk ${currentWeek} proj`;
 
-    setStatus(`loading week ${nextWeek} projections...`);
-    const projMap = await fetchProjectionsSafe(league.season, nextWeek);
+    setStatus(`loading week ${currentWeek} projections...`);
+    const projMap = await fetchProjectionsSafe(league.season, currentWeek);
 
     // Header
     document.getElementById('leagueName').textContent = league.name || 'Dynasty Command Center';
