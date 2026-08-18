@@ -16,6 +16,8 @@
     --accent-dim:#14a396;
     --alert:#E5484D;
     --good:#34D399;
+    --mine-red:#E5484D;
+    --op-blue:#3FA9F5;
   }
   *{box-sizing:border-box;}
   body{
@@ -162,13 +164,13 @@
   .prow{
     background:var(--surface);
     border:1px solid var(--line);
-    border-left:3px solid var(--accent);
+    border-left:3px solid var(--mine-red);
     border-radius:3px;
     padding:8px 9px;
     margin-bottom:6px;
   }
-  .prow.own-op{border-left-color:var(--muted);}
-  .prow.own-fa{border-left-color:#3E7A9C;}
+  .prow.own-op{border-left-color:var(--op-blue);}
+  .prow.own-fa{border-left-color:transparent;}
   .prow .pname{
     font-size:12.5px;
     font-weight:700;
@@ -180,15 +182,10 @@
     margin-top:2px;
   }
   .prow .injury{
-    display:inline-block;
-    margin-top:3px;
-    font-size:9px;
-    background:var(--alert);
-    color:var(--chalk);
-    padding:1px 5px;
-    border-radius:2px;
-    letter-spacing:0.5px;
-    text-transform:uppercase;
+    color:var(--alert);
+    font-weight:700;
+    font-size:10px;
+    margin-left:4px;
   }
   .prow .pval{
     margin-top:5px;
@@ -197,12 +194,7 @@
     color:var(--good);
   }
   .prow .pval.na{color:var(--muted);}
-  .grade-badge{font-weight:700;padding:0 3px;border-radius:2px;}
-  .grade-A{color:var(--good);}
-  .grade-B{color:var(--accent);}
-  .grade-C{color:var(--chalk);}
-  .grade-D{color:#D98A4A;}
-  .grade-F{color:var(--alert);}
+  .spread-tag{color:var(--muted);font-weight:400;}
   .rank-tag{color:#5AA9D6;font-weight:700;}
   .own-tag{
     display:inline-block;
@@ -223,6 +215,15 @@
     padding:16px 0;
     text-align:center;
   }
+  .tier-divider{
+    font-size:9px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--muted);
+    border-top:1px dashed var(--line);
+    padding-top:6px;
+    margin:2px 0 6px 0;
+  }
   .error-box{
     background:rgba(229,72,77,0.12);
     border:1px solid var(--alert);
@@ -237,7 +238,7 @@
 </head>
 <body>
 
-<div class="version-tag">v0.3</div>
+<div class="version-tag">v0.4</div>
 
 <div class="scorebug">
   <div>
@@ -321,18 +322,25 @@ function projPoints(projEntry, isHalfPpr){
   return null;
 }
 
-// Absolute point-spread -> letter grade, per Jack's scale (max-min between the two sources)
-function gradeForDiff(diff){
-  const bands = [
-    [100,'A+'],[200,'A'],[300,'A-'],[400,'B+'],[500,'B'],[600,'B-'],
-    [700,'C+'],[800,'C'],[900,'C-'],[1000,'D+'],[1100,'D'],[1200,'D-']
-  ];
-  for(const [max, letter] of bands){
-    if(diff <= max) return letter;
-  }
-  return 'F';
+// Full injury status text -> short code shown on the card
+const INJURY_CODES = {
+  'Questionable':'Q','Doubtful':'D','Out':'O','IR':'IR','PUP':'PUP',
+  'Suspended':'SUS','NA':'NA','Sus':'SUS'
+};
+function injuryCode(status){
+  if(!status) return null;
+  return INJURY_CODES[status] || status.slice(0,3).toUpperCase();
 }
-function gradeClass(letter){ return 'grade-' + letter[0]; }
+
+function fmtNum(n){ return Math.round(n).toLocaleString('en-US'); }
+
+// Tier 1 = 10,000+, each tier down is another 500 points, per Jack's scale.
+function tierFor(value){
+  if(value == null) return null;
+  const diff = 10000 - value;
+  if(diff <= 0) return 1;
+  return 1 + Math.ceil(diff / 500);
+}
 
 function normName(name){
   if(!name) return '';
@@ -434,9 +442,9 @@ function dynastyBlend(entry){
   if(entry.dpDynasty != null) vals.push(entry.dpDynasty);
   if(!vals.length) return null;
   const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
-  let grade = null;
-  if(vals.length === 2) grade = gradeForDiff(Math.abs(vals[0]-vals[1]));
-  return { avg, grade };
+  let halfSpread = null;
+  if(vals.length === 2) halfSpread = Math.round(Math.abs(vals[0]-vals[1]) / 2);
+  return { avg, halfSpread };
 }
 
 function rankBadge(position, entry){
@@ -465,14 +473,13 @@ function valueHtml(id, valuesMap, projMap, isHalfPpr, projLabel, filter){
   const entry = valuesMap ? valuesMap[id] : null;
   if(filter === 'dynasty'){
     const b = dynastyBlend(entry);
-    const badge = null;
     if(!b) return `<div class="pval na">Dyn: —</div>`;
-    const gradeHtml = b.grade ? ` <span class="grade-badge ${gradeClass(b.grade)}">${b.grade}</span>` : '';
-    return `<div class="pval">Dyn: ${Math.round(b.avg)}${gradeHtml}</div>`;
+    const spreadHtml = b.halfSpread != null ? ` <span class="spread-tag">(${fmtNum(b.halfSpread)})</span>` : '';
+    return `<div class="pval">Dyn: ${fmtNum(b.avg)}${spreadHtml}</div>`;
   }
   if(filter === 'season'){
     if(!entry || entry.fcRedraft == null) return `<div class="pval na">Ssn: —</div>`;
-    return `<div class="pval">Ssn: ${Math.round(entry.fcRedraft)}</div>`;
+    return `<div class="pval">Ssn: ${fmtNum(entry.fcRedraft)}</div>`;
   }
   // weekly
   const pts = projMap ? projPoints(projMap[id], isHalfPpr) : null;
@@ -507,13 +514,13 @@ function ownTagHtml(kind, opTeamName){
 function rowHtml(p, valuesMap, projMap, isHalfPpr, projLabel, filter, ownKind, opTeamName){
   const name = p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : p.full_name;
   const team = p.team || 'FA';
-  const injury = p.injury_status ? `<div class="injury">${p.injury_status}</div>` : '';
+  const code = injuryCode(p.injury_status);
+  const injury = code ? `<span class="injury">${code}</span>` : '';
   const badge = rankBadge(p.position, valuesMap ? valuesMap[p.player_id] : null);
   const rowCls = ownKind === 'rostered' ? 'own-op' : (ownKind === 'fa' ? 'own-fa' : '');
   return `<div class="prow ${rowCls}">
-    <div class="pname">${name}</div>
+    <div class="pname">${name}${injury}</div>
     <div class="psub">${p.position} · ${team}${badge ? ` · <span class="rank-tag">${badge}</span>` : ''}</div>
-    ${injury}
     ${valueHtml(p.player_id, valuesMap, projMap, isHalfPpr, projLabel, filter)}
     ${ownTagHtml(ownKind, opTeamName)}
   </div>`;
@@ -555,14 +562,26 @@ function renderBoard(){
       return (a.p.search_rank||9999) - (b.p.search_rank||9999);
     }).slice(0, 40); // cap per column for render performance
 
-    const rows = list.map(({p, kind}) => {
+    const rows = [];
+    let lastTier = null;
+    const tieringActive = (activeValueFilter === 'dynasty' || activeValueFilter === 'season');
+    list.forEach(({p, kind}) => {
+      if(tieringActive){
+        const val = valueFor(p.player_id, activeValueFilter, valuesMap, projMap, isHalfPpr);
+        const tier = tierFor(val);
+        if(tier != null && tier !== lastTier){
+          rows.push(`<div class="tier-divider">Tier ${tier}</div>`);
+          lastTier = tier;
+        }
+      }
       const opTeamName = kind === 'rostered' ? rosterOwnerByPlayer[p.player_id] : null;
-      return rowHtml(p, valuesMap, projMap, isHalfPpr, projLabel, activeValueFilter, kind, opTeamName);
-    }).join('');
+      rows.push(rowHtml(p, valuesMap, projMap, isHalfPpr, projLabel, activeValueFilter, kind, opTeamName));
+    });
+    const rowsHtml = rows.join('');
 
     return `<div class="col">
       <div class="col-head">${pos}</div>
-      ${rows || '<div class="empty">None</div>'}
+      ${rowsHtml || '<div class="empty">None</div>'}
     </div>`;
   }).join('');
 
