@@ -6,17 +6,16 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
   :root{
-    --bg:#0B1210;
-    --surface:#121C18;
-    --surface-raised:#182620;
-    --line:#25352E;
+    --bg:#05091D;
+    --surface:#0E1433;
+    --surface-raised:#141B3D;
+    --line:#232B52;
     --chalk:#EDEFEA;
-    --muted:#7E9089;
-    --gold:#C9A227;
-    --gold-dim:#8A7220;
-    --alert:#C0483A;
-    --good:#4C8B5E;
-    --blue:#3E7A9C;
+    --muted:#7C86AE;
+    --accent:#1FD8C4;
+    --accent-dim:#14a396;
+    --alert:#E5484D;
+    --good:#34D399;
   }
   *{box-sizing:border-box;}
   body{
@@ -42,7 +41,7 @@
   }
   .scorebug{
     background:var(--surface-raised);
-    border-bottom:3px solid var(--gold);
+    border-bottom:3px solid var(--accent);
     padding:14px 20px 14px 70px;
     display:flex;
     align-items:center;
@@ -52,7 +51,6 @@
   }
   .scorebug .league-name{
     font-weight:800;
-    font-stretch:condensed;
     letter-spacing:0.5px;
     font-size:20px;
     text-transform:uppercase;
@@ -69,7 +67,7 @@
     align-items:baseline;
     font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
   }
-  .team-strip .name{font-size:15px;font-weight:700;color:var(--gold);}
+  .team-strip .name{font-size:15px;font-weight:700;color:var(--accent);}
   .team-strip .record{font-size:15px;color:var(--chalk);}
   .controls{
     padding:12px 20px;
@@ -89,8 +87,8 @@
     font-size:13px;
   }
   button{
-    background:var(--gold);
-    color:#161200;
+    background:var(--accent);
+    color:#052420;
     border:none;
     padding:8px 16px;
     border-radius:3px;
@@ -100,47 +98,30 @@
     font-size:12px;
     cursor:pointer;
   }
-  button:hover{background:#E0B735;}
-  button:disabled{background:var(--gold-dim);cursor:default;}
+  button:hover{background:#3EEBD8;}
+  button:disabled{background:var(--accent-dim);cursor:default;}
   .status{
     font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
     font-size:12px;
     color:var(--muted);
   }
-  .tabs{
-    display:flex;
-    border-bottom:1px solid var(--line);
-    padding:0 20px;
+  .filters-wrap{
+    padding:16px 20px 0 20px;
   }
-  .tab{
-    padding:12px 18px;
-    font-size:13px;
-    font-weight:700;
-    text-transform:uppercase;
-    letter-spacing:0.5px;
-    color:var(--muted);
-    cursor:pointer;
-    border-bottom:3px solid transparent;
-  }
-  .tab.active{color:var(--chalk);border-bottom-color:var(--gold);}
-  .panel{display:none;padding:20px;}
-  .panel.active{display:block;}
-  .section-label{
-    font-size:11px;
+  .filter-row-label{
+    font-size:10px;
     text-transform:uppercase;
     letter-spacing:1.5px;
-    color:var(--gold);
-    font-weight:700;
-    margin:22px 0 10px 0;
+    color:var(--muted);
+    margin-bottom:6px;
   }
-  .section-label:first-child{margin-top:0;}
-  .value-filters{
+  .value-filters, .own-filters{
     display:flex;
     gap:6px;
-    margin-bottom:18px;
+    margin-bottom:14px;
     flex-wrap:wrap;
   }
-  .value-filter{
+  .value-filter, .own-filter{
     background:var(--surface);
     border:1px solid var(--line);
     color:var(--muted);
@@ -152,167 +133,111 @@
     text-transform:uppercase;
     cursor:pointer;
   }
-  .value-filter.active{background:var(--gold);color:#161200;border-color:var(--gold);}
-  .roster-grid{
+  .value-filter.active{background:var(--accent);color:#052420;border-color:var(--accent);}
+  .own-filter.active{background:var(--accent-dim);color:var(--chalk);border-color:var(--accent);}
+  .board{
     display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
-    gap:10px;
+    grid-template-columns:repeat(7, minmax(160px, 1fr));
+    gap:0;
+    padding:0 20px 24px 20px;
+    overflow-x:auto;
   }
-  .card{
+  .col{
+    border-right:1px solid var(--line);
+    padding:0 8px;
+    min-width:160px;
+  }
+  .col:last-child{border-right:none;}
+  .col-head{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    color:var(--accent);
+    font-weight:700;
+    padding:10px 4px;
+    border-bottom:2px solid var(--line);
+    margin-bottom:8px;
+    text-align:center;
+  }
+  .prow{
     background:var(--surface);
     border:1px solid var(--line);
-    border-left:3px solid var(--gold);
+    border-left:3px solid var(--accent);
     border-radius:3px;
-    padding:10px 12px;
+    padding:8px 9px;
+    margin-bottom:6px;
   }
-  .card.bench{border-left-color:var(--muted);}
-  .card .pos{
-    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+  .prow.own-op{border-left-color:var(--muted);}
+  .prow.own-fa{border-left-color:#3E7A9C;}
+  .prow .pname{
+    font-size:12.5px;
+    font-weight:700;
+    line-height:1.25;
+  }
+  .prow .psub{
     font-size:10px;
-    color:var(--gold);
-    letter-spacing:1px;
+    color:var(--muted);
+    margin-top:2px;
   }
-  .card .starter-tag{
+  .prow .injury{
     display:inline-block;
-    margin-left:6px;
+    margin-top:3px;
     font-size:9px;
-    color:var(--bg);
-    background:var(--good);
+    background:var(--alert);
+    color:var(--chalk);
     padding:1px 5px;
     border-radius:2px;
     letter-spacing:0.5px;
-    font-weight:700;
-    vertical-align:middle;
-  }
-  .card .pname{
-    font-size:14px;
-    font-weight:700;
-    margin:2px 0;
-  }
-  .card .sub{
-    font-size:11px;
-    color:var(--muted);
-  }
-  .card .injury{
-    display:inline-block;
-    margin-top:4px;
-    font-size:10px;
-    background:var(--alert);
-    color:var(--chalk);
-    padding:2px 6px;
-    border-radius:2px;
-    letter-spacing:0.5px;
     text-transform:uppercase;
   }
-  .card .valline{
-    margin-top:6px;
+  .prow .pval{
+    margin-top:5px;
     font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
-    font-size:11px;
+    font-size:11.5px;
     color:var(--good);
-    display:flex;
-    align-items:center;
-    gap:6px;
   }
-  .card .valline.na{color:var(--muted);}
-  .grade-badge{
-    font-weight:700;
-    padding:0 4px;
-    border-radius:2px;
-  }
+  .prow .pval.na{color:var(--muted);}
+  .grade-badge{font-weight:700;padding:0 3px;border-radius:2px;}
   .grade-A{color:var(--good);}
-  .grade-B{color:var(--gold);}
+  .grade-B{color:var(--accent);}
   .grade-C{color:var(--chalk);}
   .grade-D{color:#D98A4A;}
   .grade-F{color:var(--alert);}
-  .rank-badge{
-    color:var(--blue);
-    font-weight:700;
-    margin-left:6px;
-  }
-  .dp-weekly{
-    margin-top:2px;
-    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
-    font-size:10px;
-    color:var(--muted);
-  }
-  table{
-    width:100%;
-    border-collapse:collapse;
-    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
-    font-size:13px;
-  }
-  th,td{
-    text-align:left;
-    padding:8px 10px;
-    border-bottom:1px solid var(--line);
-  }
-  th{
-    color:var(--muted);
+  .rank-tag{color:#5AA9D6;font-weight:700;}
+  .own-tag{
+    display:inline-block;
+    margin-top:4px;
+    font-size:9px;
+    padding:1px 5px;
+    border-radius:2px;
+    letter-spacing:0.5px;
     text-transform:uppercase;
-    font-size:11px;
-    letter-spacing:1px;
-    font-weight:600;
+    font-weight:700;
   }
-  tr.me{background:rgba(201,162,39,0.08);}
-  tr.me td:first-child{color:var(--gold);font-weight:700;}
+  .own-tag.mine{background:var(--accent-dim);color:var(--chalk);}
+  .own-tag.op{background:var(--surface-raised);color:var(--muted);border:1px solid var(--line);}
+  .own-tag.fa{background:#173047;color:#7FC4E8;}
   .empty{
     color:var(--muted);
-    font-size:13px;
-    padding:30px 0;
+    font-size:12px;
+    padding:16px 0;
     text-align:center;
   }
   .error-box{
-    background:rgba(192,72,58,0.12);
+    background:rgba(229,72,77,0.12);
     border:1px solid var(--alert);
-    color:#E8998E;
+    color:#F6A9AC;
     padding:12px 14px;
     border-radius:3px;
     font-size:13px;
     margin:0 20px 16px 20px;
     font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
   }
-  .fa-list{
-    display:flex;
-    flex-direction:column;
-    gap:6px;
-  }
-  .fa-row{
-    display:grid;
-    grid-template-columns:50px 1fr 90px 90px 80px;
-    align-items:center;
-    background:var(--surface);
-    border:1px solid var(--line);
-    border-radius:3px;
-    padding:8px 12px;
-    font-size:13px;
-    gap:6px;
-  }
-  .fa-row .pos-badge{
-    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
-    font-size:11px;
-    color:var(--gold);
-  }
-  .fa-row .val-val{
-    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
-    color:var(--good);
-    text-align:right;
-    font-size:12px;
-  }
-  .fa-row .val-val.na{color:var(--muted);}
-  .fa-head{
-    display:grid;
-    grid-template-columns:50px 1fr 90px 90px 80px;
-    padding:0 12px 6px 12px;
-    font-size:10px;
-    text-transform:uppercase;
-    letter-spacing:1px;
-    color:var(--muted);
-  }
 </style>
 </head>
 <body>
 
-<div class="version-tag">v0.2</div>
+<div class="version-tag">v0.3</div>
 
 <div class="scorebug">
   <div>
@@ -331,43 +256,26 @@
 
 <div id="errorBox"></div>
 
-<div class="tabs">
-  <div class="tab active" data-tab="roster">My Roster</div>
-  <div class="tab" data-tab="standings">League Standings</div>
-  <div class="tab" data-tab="freeagents">Free Agents</div>
+<div class="filters-wrap">
+  <div class="filter-row-label">Value</div>
+  <div class="value-filters" id="valueFilters"></div>
+  <div class="filter-row-label">Show</div>
+  <div class="own-filters" id="ownFilters"></div>
 </div>
 
-<div class="panel active" id="panel-roster">
-  <div id="rosterContent"><div class="empty">No data yet — pull latest to load your roster.</div></div>
-</div>
-
-<div class="panel" id="panel-standings">
-  <div id="standingsContent"><div class="empty">No data yet — pull latest to load standings.</div></div>
-</div>
-
-<div class="panel" id="panel-freeagents">
-  <div id="freeAgentsContent"><div class="empty">No data yet — pull latest to load free agents.</div></div>
+<div class="board" id="board">
+  <div class="empty">No data yet — pull latest to load the board.</div>
 </div>
 
 <script>
 const API = 'https://api.sleeper.app/v1';
 const DP_VALUES_URL = 'https://raw.githubusercontent.com/DynastyProcess/data/master/files/values-players.csv';
-const FC_VALUES_URL = 'https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=1&numTeams=10&ppr=0.5';
+const DP_WEEKLY_URL = 'https://raw.githubusercontent.com/DynastyProcess/data/master/files/fp_latest_weekly.csv';
 
-let players = null;       // full Sleeper player dict, fetched once per session
-let activeFilter = 'dynasty'; // 'dynasty' | 'season' | 'weekly'
-
-// Cache of last successful pull, so switching filters doesn't require a refetch
-let lastData = null; // { myRoster, league, rosters, usersById, playerMap, projMap, isHalfPpr, projLabel, valuesMap, currentWeek }
-
-document.querySelectorAll('.tab').forEach(t=>{
-  t.addEventListener('click', ()=>{
-    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
-    t.classList.add('active');
-    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
-  });
-});
+let players = null;
+let activeValueFilter = 'dynasty'; // 'dynasty' | 'season' | 'weekly'
+let activeOwnFilters = new Set(['mine','fa','rostered']); // multi-select
+let lastData = null;
 
 function setStatus(msg){ document.getElementById('statusLine').textContent = msg; }
 function showError(msg){
@@ -424,11 +332,8 @@ function gradeForDiff(diff){
   }
   return 'F';
 }
-function gradeClass(letter){
-  return 'grade-' + letter[0]; // grade-A, grade-B, ... grade-F
-}
+function gradeClass(letter){ return 'grade-' + letter[0]; }
 
-// Name normalization for matching DynastyProcess rows (keyed by name) to Sleeper players
 function normName(name){
   if(!name) return '';
   return name.toLowerCase()
@@ -439,7 +344,6 @@ function normName(name){
     .trim();
 }
 
-// FantasyCalc: public API, includes sleeperId directly — reliable join, no name matching needed.
 async function fetchFantasyCalcSafe(numQbs){
   try{
     const url = `https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=${numQbs}&numTeams=10&ppr=0.5`;
@@ -456,7 +360,6 @@ async function fetchFantasyCalcSafe(numQbs){
   }
 }
 
-// DynastyProcess: open-data CSV, keyed by player name — approximate match, fails soft per player.
 async function fetchDynastyProcessSafe(numQbs){
   try{
     const res = await fetch(DP_VALUES_URL);
@@ -464,7 +367,7 @@ async function fetchDynastyProcessSafe(numQbs){
     const text = await res.text();
     const parsed = Papa.parse(text, { header: true, dynamicTyping: true, skipEmptyLines: true });
     const valueField = numQbs >= 2 ? 'value_2qb' : 'value_1qb';
-    const map = {}; // normalized name -> { value, posRank }
+    const map = {};
     parsed.data.forEach(row => {
       if(!row.player) return;
       const val = row[valueField];
@@ -478,25 +381,20 @@ async function fetchDynastyProcessSafe(numQbs){
   }
 }
 
-// DynastyProcess also republishes FantasyPros' weekly start/sit data (pos rank, letter
-// grade, projected points). Note: this only refreshes once the regular season is underway —
-// during the offseason/preseason it can be stale (last season's final week). We surface the
-// scrape date so that staleness is visible rather than hidden.
+// Republished FantasyPros weekly start/sit data. Only refreshes once the regular season is
+// underway — during offseason/preseason it's stale (last season's final week). Scrape date
+// is surfaced on the card so staleness is visible, not hidden.
 async function fetchDynastyProcessWeeklySafe(){
   try{
-    const url = 'https://raw.githubusercontent.com/DynastyProcess/data/master/files/fp_latest_weekly.csv';
-    const res = await fetch(url);
+    const res = await fetch(DP_WEEKLY_URL);
     if(!res.ok) throw new Error(`DP weekly returned ${res.status}`);
     const text = await res.text();
     const parsed = Papa.parse(text, { header: true, dynamicTyping: true, skipEmptyLines: true });
-    const map = {}; // normalized name -> { posRank, grade, pts, scrapeDate }
+    const map = {};
     parsed.data.forEach(row => {
       if(!row.player_name) return;
       map[normName(row.player_name)] = {
-        posRank: row.pos_rank,
-        grade: row.start_sit_grade,
-        pts: row.r2p_pts,
-        scrapeDate: row.scrape_date
+        posRank: row.pos_rank, grade: row.start_sit_grade, pts: row.r2p_pts, scrapeDate: row.scrape_date
       };
     });
     return map;
@@ -507,7 +405,6 @@ async function fetchDynastyProcessWeeklySafe(){
 }
 
 function buildValuesMap(playerMap, fcMap, dpNameMap, dpWeeklyMap){
-  // sleeper_id -> { fcDynasty, fcRedraft, fcPosRank, dpDynasty, dpPosRank, dpWeekly }
   const out = {};
   Object.keys(playerMap).forEach(id => {
     const p = playerMap[id];
@@ -524,16 +421,12 @@ function buildValuesMap(playerMap, fcMap, dpNameMap, dpWeeklyMap){
       entry.dpDynasty = dpNameMap[key].value;
       entry.dpPosRank = dpNameMap[key].posRank;
     }
-    if(dpWeeklyMap && dpWeeklyMap[key]){
-      entry.dpWeekly = dpWeeklyMap[key];
-    }
+    if(dpWeeklyMap && dpWeeklyMap[key]) entry.dpWeekly = dpWeeklyMap[key];
     if(Object.keys(entry).length) out[id] = entry;
   });
   return out;
 }
 
-// Absolute point-spread between FC and DP dynasty values -> letter grade (Jack's scale).
-// Only computed when both sources have a number; a single-source player just shows the value.
 function dynastyBlend(entry){
   if(!entry) return null;
   const vals = [];
@@ -542,13 +435,10 @@ function dynastyBlend(entry){
   if(!vals.length) return null;
   const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
   let grade = null;
-  if(vals.length === 2){
-    grade = gradeForDiff(Math.abs(vals[0]-vals[1]));
-  }
+  if(vals.length === 2) grade = gradeForDiff(Math.abs(vals[0]-vals[1]));
   return { avg, grade };
 }
 
-// Average positional rank across sources, e.g. FC RB1 + DP RB3 -> "RB2.0"
 function rankBadge(position, entry){
   if(!entry) return null;
   const ranks = [];
@@ -568,189 +458,141 @@ function valueFor(id, filter, valuesMap, projMap, isHalfPpr){
   if(filter === 'season'){
     return entry && entry.fcRedraft != null ? entry.fcRedraft : null;
   }
-  // weekly
   return projMap ? projPoints(projMap[id], isHalfPpr) : null;
 }
 
-function valueLineHtml(id, valuesMap, projMap, isHalfPpr, projLabel){
+function valueHtml(id, valuesMap, projMap, isHalfPpr, projLabel, filter){
   const entry = valuesMap ? valuesMap[id] : null;
-  const b = dynastyBlend(entry);
+  if(filter === 'dynasty'){
+    const b = dynastyBlend(entry);
+    const badge = null;
+    if(!b) return `<div class="pval na">Dyn: —</div>`;
+    const gradeHtml = b.grade ? ` <span class="grade-badge ${gradeClass(b.grade)}">${b.grade}</span>` : '';
+    return `<div class="pval">Dyn: ${Math.round(b.avg)}${gradeHtml}</div>`;
+  }
+  if(filter === 'season'){
+    if(!entry || entry.fcRedraft == null) return `<div class="pval na">Ssn: —</div>`;
+    return `<div class="pval">Ssn: ${Math.round(entry.fcRedraft)}</div>`;
+  }
+  // weekly
   const pts = projMap ? projPoints(projMap[id], isHalfPpr) : null;
-
-  const dynastyStr = b
-    ? `Dyn: ${Math.round(b.avg)}${b.grade ? ` <span class="grade-badge ${gradeClass(b.grade)}">${b.grade}</span>` : ''}`
-    : `Dyn: —`;
-  const seasonStr = (entry && entry.fcRedraft != null) ? `Ssn: ${Math.round(entry.fcRedraft)}` : `Ssn: —`;
-  const weeklyStr = (pts != null) ? `${projLabel}: ${pts.toFixed(1)}` : `${projLabel}: —`;
-
-  const naClass = (!b && !(entry && entry.fcRedraft != null) && pts == null) ? ' na' : '';
-  let html = `<div class="valline${naClass}">${dynastyStr} · ${seasonStr} · ${weeklyStr}</div>`;
-
+  let html = pts != null
+    ? `<div class="pval">${projLabel}: ${pts.toFixed(1)}</div>`
+    : `<div class="pval na">${projLabel}: —</div>`;
   if(entry && entry.dpWeekly){
     const w = entry.dpWeekly;
     const parts = [];
     if(w.posRank) parts.push(w.posRank);
     if(w.grade) parts.push(`Grade ${w.grade}`);
-    if(w.pts != null) parts.push(`${w.pts} pts`);
-    if(parts.length){
-      html += `<div class="dp-weekly">FP (as of ${w.scrapeDate}): ${parts.join(' · ')}</div>`;
-    }
+    if(parts.length) html += `<div class="psub">FP (${w.scrapeDate}): ${parts.join(' · ')}</div>`;
   }
   return html;
 }
 
-function posSort(a,b){
-  const order = {QB:0,RB:1,WR:2,TE:3,K:4,DEF:5};
-  return (order[a]??9) - (order[b]??9);
+const POSITIONS = ['QB','RB','WR','FLEX','TE','K','DEF'];
+const FLEX_ELIGIBLE = ['RB','WR','TE'];
+
+function ownershipOf(playerId, myIds, rosteredIds){
+  if(myIds.has(playerId)) return 'mine';
+  if(rosteredIds.has(playerId)) return 'rostered';
+  return 'fa';
 }
 
-function renderRoster(roster, playerMap, valuesMap, projMap, isHalfPpr, projLabel, filter){
-  const starterSet = new Set(roster.starters || []);
-  const allIds = roster.players || [];
+function ownTagHtml(kind, opTeamName){
+  if(kind === 'mine') return `<span class="own-tag mine">MINE</span>`;
+  if(kind === 'rostered') return `<span class="own-tag op">${opTeamName || 'OTHER TEAM'}</span>`;
+  return `<span class="own-tag fa">FA</span>`;
+}
 
-  const groups = {};
-  allIds.forEach(id => {
-    const p = playerMap[id];
-    const pos = (p && p.position) || 'OTHER';
-    if(!groups[pos]) groups[pos] = [];
-    groups[pos].push(id);
+function rowHtml(p, valuesMap, projMap, isHalfPpr, projLabel, filter, ownKind, opTeamName){
+  const name = p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : p.full_name;
+  const team = p.team || 'FA';
+  const injury = p.injury_status ? `<div class="injury">${p.injury_status}</div>` : '';
+  const badge = rankBadge(p.position, valuesMap ? valuesMap[p.player_id] : null);
+  const rowCls = ownKind === 'rostered' ? 'own-op' : (ownKind === 'fa' ? 'own-fa' : '');
+  return `<div class="prow ${rowCls}">
+    <div class="pname">${name}</div>
+    <div class="psub">${p.position} · ${team}${badge ? ` · <span class="rank-tag">${badge}</span>` : ''}</div>
+    ${injury}
+    ${valueHtml(p.player_id, valuesMap, projMap, isHalfPpr, projLabel, filter)}
+    ${ownTagHtml(ownKind, opTeamName)}
+  </div>`;
+}
+
+function renderBoard(){
+  if(!lastData) return;
+  const { playerMap, valuesMap, projMap, isHalfPpr, projLabel, myIds, rosteredIds, rosterOwnerByPlayer } = lastData;
+
+  // Build eligible pool per column, filtered by active ownership toggles
+  const pools = {};
+  POSITIONS.forEach(pos => pools[pos] = []);
+
+  Object.values(playerMap).forEach(p => {
+    if(!p || !p.position) return;
+    const kind = ownershipOf(p.player_id, myIds, rosteredIds);
+    if(!activeOwnFilters.has(kind === 'mine' ? 'mine' : (kind === 'rostered' ? 'rostered' : 'fa'))) return;
+
+    // Free agents: exclude anyone with no current NFL team (fixes name-collision
+    // ghosts in Sleeper's player list — e.g. inactive/practice-squad namesakes)
+    if(kind === 'fa' && !p.team) return;
+    if(kind === 'fa' && !['Active'].includes(p.status) && p.position !== 'DEF') return;
+
+    if(p.position === 'QB' || p.position === 'RB' || p.position === 'WR' || p.position === 'TE' || p.position === 'K' || p.position === 'DEF'){
+      pools[p.position].push({p, kind});
+    }
+    if(FLEX_ELIGIBLE.includes(p.position)){
+      pools['FLEX'].push({p, kind});
+    }
   });
 
-  const sortedPositions = Object.keys(groups).sort(posSort);
-
-  function cardFor(id){
-    const p = playerMap[id];
-    const isStarter = starterSet.has(id);
-    const cls = isStarter ? '' : 'bench';
-    if(!p) return `<div class="card ${cls}"><div class="pname">${id}</div><div class="sub">unknown player id</div></div>`;
-    const name = p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : (p.full_name || id);
-    const team = p.team || 'FA';
-    const injury = p.injury_status ? `<div class="injury">${p.injury_status}</div>` : '';
-    const starterTag = isStarter ? `<span class="starter-tag">STARTER</span>` : '';
-    const badge = rankBadge(p.position, valuesMap ? valuesMap[id] : null);
-    const badgeHtml = badge ? `<span class="rank-badge">${badge}</span>` : '';
-    return `<div class="card ${cls}">
-      <div class="pos">${p.position || '-'} · ${team}${badgeHtml}${starterTag}</div>
-      <div class="pname">${name}</div>
-      ${injury}
-      ${valueLineHtml(id, valuesMap, projMap, isHalfPpr, projLabel)}
-    </div>`;
-  }
-
-  const sections = sortedPositions.map(pos => {
-    const ids = groups[pos].slice().sort((a,b) => {
-      const va = valueFor(a, filter, valuesMap, projMap, isHalfPpr);
-      const vb = valueFor(b, filter, valuesMap, projMap, isHalfPpr);
+  const boardHtml = POSITIONS.map(pos => {
+    const list = pools[pos].slice().sort((a,b) => {
+      const va = valueFor(a.p.player_id, activeValueFilter, valuesMap, projMap, isHalfPpr);
+      const vb = valueFor(b.p.player_id, activeValueFilter, valuesMap, projMap, isHalfPpr);
       if(va != null && vb != null) return vb - va;
       if(va != null) return -1;
       if(vb != null) return 1;
-      return 0;
-    });
-    const label = pos === 'DEF' ? 'DEFENSE' : (pos === 'OTHER' ? 'OTHER' : pos + 'S');
-    return `<div class="section-label">${label}</div>
-      <div class="roster-grid">${ids.map(cardFor).join('')}</div>`;
-  }).join('');
-
-  return sections || '<div class="empty">No players on this roster</div>';
-}
-
-function renderFreeAgents(playerMap, rosteredIds, valuesMap, projMap, isHalfPpr, projLabel, filter){
-  const positions = ['QB','RB','WR','TE','K','DEF'];
-  const rows = Object.values(playerMap)
-    .filter(p => p && p.position && positions.includes(p.position))
-    .filter(p => p.status === 'Active' || p.position === 'DEF')
-    .filter(p => !rosteredIds.has(p.player_id))
-    .map(p => ({ p, val: valueFor(p.player_id, filter, valuesMap, projMap, isHalfPpr) }))
-    .sort((a,b) => {
-      if(a.val != null && b.val != null) return b.val - a.val;
-      if(a.val != null) return -1;
-      if(b.val != null) return 1;
       return (a.p.search_rank||9999) - (b.p.search_rank||9999);
-    })
-    .slice(0, 60);
+    }).slice(0, 40); // cap per column for render performance
 
-  const head = `<div class="fa-head"><span></span><span>Player</span><span style="text-align:right;">Dynasty</span><span style="text-align:right;">Season</span><span style="text-align:right;">${projLabel}</span></div>`;
+    const rows = list.map(({p, kind}) => {
+      const opTeamName = kind === 'rostered' ? rosterOwnerByPlayer[p.player_id] : null;
+      return rowHtml(p, valuesMap, projMap, isHalfPpr, projLabel, activeValueFilter, kind, opTeamName);
+    }).join('');
 
-  const rowsHtml = rows.map(({p}) => {
-    const id = p.player_id;
-    const name = p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : p.full_name;
-    const entry = valuesMap ? valuesMap[id] : null;
-    const b = dynastyBlend(entry);
-    const pts = projMap ? projPoints(projMap[id], isHalfPpr) : null;
-
-    const dynHtml = b
-      ? `<span class="val-val">${Math.round(b.avg)}${b.grade ? ` <span class="grade-badge ${gradeClass(b.grade)}">${b.grade}</span>` : ''}</span>`
-      : `<span class="val-val na">—</span>`;
-    const ssnHtml = (entry && entry.fcRedraft != null)
-      ? `<span class="val-val">${Math.round(entry.fcRedraft)}</span>`
-      : `<span class="val-val na">—</span>`;
-    const wkHtml = (pts != null)
-      ? `<span class="val-val">${pts.toFixed(1)}</span>`
-      : `<span class="val-val na">—</span>`;
-
-    return `<div class="fa-row">
-      <span class="pos-badge">${p.position}</span>
-      <span>${name} <span style="color:var(--muted);">· ${p.team || 'FA'}</span></span>
-      ${dynHtml}
-      ${ssnHtml}
-      ${wkHtml}
+    return `<div class="col">
+      <div class="col-head">${pos}</div>
+      ${rows || '<div class="empty">None</div>'}
     </div>`;
   }).join('');
 
-  return `${head}<div class="fa-list">${rowsHtml || '<div class="empty">No free agents found</div>'}</div>`;
+  document.getElementById('board').innerHTML = boardHtml;
 }
 
-function renderStandings(rosters, usersById, myRosterId){
-  const rows = rosters
-    .slice()
-    .sort((a,b) => (b.settings.wins - a.settings.wins) || ((b.settings.fpts||0) - (a.settings.fpts||0)))
-    .map(r => {
-      const u = usersById[r.owner_id] || {};
-      const teamName = (u.metadata && u.metadata.team_name) || u.display_name || 'Unknown';
-      const rec = `${r.settings.wins || 0}-${r.settings.losses || 0}${r.settings.ties ? '-'+r.settings.ties : ''}`;
-      const pf = (r.settings.fpts || 0) + (r.settings.fpts_decimal ? r.settings.fpts_decimal/100 : 0);
-      const rowClass = r.roster_id === myRosterId ? 'me' : '';
-      return `<tr class="${rowClass}">
-        <td>${teamName}</td>
-        <td>${u.display_name || ''}</td>
-        <td>${rec}</td>
-        <td>${pf.toFixed(1)}</td>
-      </tr>`;
-    }).join('');
-
-  return `<table>
-    <thead><tr><th>Team</th><th>Manager</th><th>Record</th><th>Points For</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
-}
-
-function renderAll(){
-  if(!lastData) return;
-  const { myRoster, rosters, usersById, playerMap, projMap, isHalfPpr, projLabel, valuesMap, rosteredIds } = lastData;
-
-  document.getElementById('rosterContent').innerHTML =
-    `<div class="value-filters" id="valueFilters">
-      <div class="value-filter ${activeFilter==='dynasty'?'active':''}" data-filter="dynasty">Dynasty Value</div>
-      <div class="value-filter ${activeFilter==='season'?'active':''}" data-filter="season">Season Value</div>
-      <div class="value-filter ${activeFilter==='weekly'?'active':''}" data-filter="weekly">Weekly Value</div>
-    </div>` +
-    renderRoster(myRoster, playerMap, valuesMap, projMap, isHalfPpr, projLabel, activeFilter);
-
-  document.getElementById('standingsContent').innerHTML =
-    renderStandings(rosters, usersById, myRoster.roster_id);
-
-  document.getElementById('freeAgentsContent').innerHTML =
-    `<div class="value-filters" id="valueFiltersFA">
-      <div class="value-filter ${activeFilter==='dynasty'?'active':''}" data-filter="dynasty">Dynasty Value</div>
-      <div class="value-filter ${activeFilter==='season'?'active':''}" data-filter="season">Season Value</div>
-      <div class="value-filter ${activeFilter==='weekly'?'active':''}" data-filter="weekly">Weekly Value</div>
-    </div>` +
-    renderFreeAgents(playerMap, rosteredIds, valuesMap, projMap, isHalfPpr, projLabel, activeFilter);
-
-  document.querySelectorAll('.value-filter').forEach(btn => {
+function renderFilters(){
+  const vf = document.getElementById('valueFilters');
+  vf.innerHTML = ['dynasty','season','weekly'].map(f => {
+    const label = f === 'dynasty' ? 'Dynasty Value' : (f === 'season' ? 'Season Value' : 'Weekly Value');
+    return `<div class="value-filter ${activeValueFilter===f?'active':''}" data-filter="${f}">${label}</div>`;
+  }).join('');
+  vf.querySelectorAll('.value-filter').forEach(btn => {
     btn.addEventListener('click', () => {
-      activeFilter = btn.dataset.filter;
-      renderAll();
+      activeValueFilter = btn.dataset.filter;
+      renderFilters();
+      renderBoard();
+    });
+  });
+
+  const of = document.getElementById('ownFilters');
+  of.innerHTML = [['mine','My Team'],['fa','Free Agents'],['rostered','Rostered']].map(([key,label]) => {
+    return `<div class="own-filter ${activeOwnFilters.has(key)?'active':''}" data-own="${key}">${label}</div>`;
+  }).join('');
+  of.querySelectorAll('.own-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.own;
+      if(activeOwnFilters.has(key)) activeOwnFilters.delete(key); else activeOwnFilters.add(key);
+      renderFilters();
+      renderBoard();
     });
   });
 }
@@ -790,7 +632,6 @@ async function pullLatest(){
 
     const playerMap = await loadPlayersOnce();
 
-    // display_week is Sleeper's own "current/upcoming week" field — do not add +1 to it.
     const currentWeek = state.display_week || state.week || state.leg || 1;
     const recPpr = league.scoring_settings && league.scoring_settings.rec;
     const isHalfPpr = recPpr === 0.5;
@@ -809,7 +650,6 @@ async function pullLatest(){
 
     const valuesMap = buildValuesMap(playerMap, fcMap, dpNameMap, dpWeeklyMap);
 
-    // Header
     document.getElementById('leagueName').textContent = league.name || 'Dynasty Command Center';
     document.getElementById('leagueMeta').textContent =
       `${league.season} season · ${state.season_type} · week ${currentWeek} · ${league.total_rosters} teams`;
@@ -820,15 +660,26 @@ async function pullLatest(){
     document.getElementById('teamStrip').innerHTML =
       `<span class="name">${myTeamName}</span><span class="record">${rec}</span>`;
 
+    const myIds = new Set(myRoster.players || []);
     const rosteredIds = new Set();
-    rosters.forEach(r => (r.players || []).forEach(id => rosteredIds.add(id)));
+    const rosterOwnerByPlayer = {};
+    rosters.forEach(r => {
+      if(r.roster_id === myRoster.roster_id) return;
+      const u = usersById[r.owner_id] || {};
+      const teamName = (u.metadata && u.metadata.team_name) || u.display_name || 'Other Team';
+      (r.players || []).forEach(id => {
+        rosteredIds.add(id);
+        rosterOwnerByPlayer[id] = teamName;
+      });
+    });
 
-    lastData = { myRoster, rosters, usersById, playerMap, projMap, isHalfPpr, projLabel, valuesMap, rosteredIds };
-    renderAll();
+    lastData = { playerMap, valuesMap, projMap, isHalfPpr, projLabel, myIds, rosteredIds, rosterOwnerByPlayer };
+    renderFilters();
+    renderBoard();
 
     try{
       await window.storage.set('last-inputs', JSON.stringify({username, leagueId}), false);
-    }catch(e){ /* storage is best-effort */ }
+    }catch(e){ /* best-effort */ }
 
     const warnings = [];
     if(!projMap) warnings.push('weekly projections unavailable');
@@ -846,6 +697,7 @@ async function pullLatest(){
 }
 
 document.getElementById('fetchBtn').addEventListener('click', pullLatest);
+renderFilters();
 
 (async function init(){
   try{
