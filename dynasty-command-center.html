@@ -209,6 +209,100 @@
   .own-tag.mine{background:var(--accent-dim);color:var(--chalk);}
   .own-tag.op{background:var(--surface-raised);color:var(--muted);border:1px solid var(--line);}
   .own-tag.fa{background:#173047;color:#7FC4E8;}
+  .view-toggle{
+    display:flex;
+    gap:6px;
+    padding:10px 20px 0 20px;
+  }
+  .view-btn{
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--muted);
+    padding:8px 18px;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    cursor:pointer;
+    border-radius:3px 3px 0 0;
+  }
+  .view-btn.active{background:var(--accent);color:#052420;border-color:var(--accent);}
+  .view-panel{display:none;}
+  .view-panel.active{display:block;}
+  .predictor-wrap{padding:20px;max-width:900px;}
+  .predictor-search{
+    width:100%;
+    max-width:420px;
+    margin-bottom:10px;
+  }
+  .predictor-results{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    max-width:420px;
+    margin-bottom:20px;
+  }
+  .predictor-result-row{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:8px 12px;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .predictor-result-row:hover{border-color:var(--accent);}
+  .predictor-result-row .sub{font-size:11px;color:var(--muted);}
+  .predictor-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:20px;
+  }
+  .predictor-card .phead{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .predictor-card .pname{font-size:20px;font-weight:800;}
+  .predictor-card .psub{font-size:12px;color:var(--muted);font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;}
+  .composite-box{
+    text-align:center;
+    background:var(--surface-raised);
+    border-radius:4px;
+    padding:12px 20px;
+    min-width:110px;
+  }
+  .composite-box .score{font-size:32px;font-weight:800;color:var(--accent);}
+  .composite-box .tier{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:2px;}
+  .predictor-note{
+    font-size:11px;
+    color:var(--muted);
+    background:var(--surface-raised);
+    border-left:3px solid var(--op-blue);
+    padding:8px 12px;
+    margin-bottom:16px;
+    border-radius:0 3px 3px 0;
+  }
+  .predict-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;}
+  .predict-table th,.predict-table td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);}
+  .predict-table th{color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:1px;}
+  .predict-table td.num{font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;text-align:right;}
+  .predict-table td.actual{color:var(--good);}
+  .predict-table td.predicted{color:var(--accent);}
+  .predictor-inputs{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+    gap:8px;
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:11px;
+  }
+  .predictor-inputs .pi{background:var(--surface-raised);border-radius:3px;padding:6px 8px;}
+  .predictor-inputs .pi .lbl{color:var(--muted);}
+  .predictor-inputs .pi.missing{opacity:0.4;}
+
   .empty{
     color:var(--muted);
     font-size:12px;
@@ -238,7 +332,7 @@
 </head>
 <body>
 
-<div class="version-tag">v0.4</div>
+<div class="version-tag">v0.5</div>
 
 <div class="scorebug">
   <div>
@@ -264,14 +358,44 @@
   <div class="own-filters" id="ownFilters"></div>
 </div>
 
+<div class="view-toggle">
+  <div class="view-btn active" data-view="board">Roster Board</div>
+  <div class="view-btn" data-view="predictor">Player Predictor</div>
+</div>
+
+<div class="view-panel active" id="view-board">
 <div class="board" id="board">
   <div class="empty">No data yet — pull latest to load the board.</div>
+</div>
+</div>
+
+<div class="view-panel" id="view-predictor">
+  <div class="predictor-wrap">
+    <input type="text" class="predictor-search" id="predictorSearch" placeholder="Search any player, 1999-present, or a 2026 rookie...">
+    <div class="predictor-results" id="predictorResults"></div>
+    <div id="predictorCard"></div>
+  </div>
 </div>
 
 <script>
 const API = 'https://api.sleeper.app/v1';
 const DP_VALUES_URL = 'https://raw.githubusercontent.com/DynastyProcess/data/master/files/values-players.csv';
 const DP_WEEKLY_URL = 'https://raw.githubusercontent.com/DynastyProcess/data/master/files/fp_latest_weekly.csv';
+const RESEARCH_DB_URL = 'https://raw.githubusercontent.com/snipesmcgeee/ffb-research/main/ffb_research_database.csv';
+const MODEL_URL = 'https://raw.githubusercontent.com/snipesmcgeee/ffb-research/main/model_coefficients.json';
+
+let researchDB = null;   // parsed rows from ffb_research_database.csv
+let predictModel = null; // parsed model_coefficients.json
+
+document.querySelectorAll('.view-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-' + btn.dataset.view).classList.add('active');
+    if(btn.dataset.view === 'predictor') loadResearchDataOnce();
+  });
+});
 
 let players = null;
 let activeValueFilter = 'dynasty'; // 'dynasty' | 'season' | 'weekly'
@@ -714,6 +838,162 @@ async function pullLatest(){
     btn.disabled = false;
   }
 }
+
+// ===================== Player Predictor =====================
+
+async function loadResearchDataOnce(){
+  if(researchDB && predictModel) return;
+  const resultsEl = document.getElementById('predictorResults');
+  resultsEl.innerHTML = '<div class="empty">Loading research database...</div>';
+  try{
+    const [csvText, modelJson] = await Promise.all([
+      fetch(RESEARCH_DB_URL).then(r => r.text()),
+      fetch(MODEL_URL).then(r => r.json())
+    ]);
+    const parsed = Papa.parse(csvText, { header: true, dynamicTyping: true, skipEmptyLines: true });
+    researchDB = parsed.data;
+    predictModel = modelJson;
+    resultsEl.innerHTML = '';
+  }catch(e){
+    console.error('Research data load failed', e);
+    resultsEl.innerHTML = '<div class="empty">Couldn\'t load the research database or model from ffb-research. Check the repo is public and the files are named correctly.</div>';
+  }
+}
+
+function predictorHtInches(s){
+  if(!s) return null;
+  const parts = String(s).split('-');
+  if(parts.length !== 2) return null;
+  return parseInt(parts[0])*12 + parseInt(parts[1]);
+}
+
+// Apply the stored regression: impute missing predictors with training-set means,
+// standardize, dot with coefficients + intercept.
+function runModel(row, position, target){
+  const m = predictModel.models[position] && predictModel.models[position][target];
+  if(!m) return null;
+  const preds = predictModel.predictors;
+  const x = preds.map((p, i) => {
+    let v = p === 'combine_ht_in' ? predictorHtInches(row['combine_ht']) : row[p];
+    if(v == null || v === '' || isNaN(v)) v = m.impute_mean[i];
+    return v;
+  });
+  const xs = x.map((v, i) => (v - m.scaler_mean[i]) / m.scaler_scale[i]);
+  let out = m.intercept;
+  for(let i=0;i<xs.length;i++) out += xs[i]*m.coef[i];
+  return out;
+}
+
+const PREDICT_TARGETS = ['ceiling_inv','peak3_ratio','career_pts','top12_rate'];
+const PREDICT_LABELS = {
+  ceiling_inv: 'Ceiling (best season)', peak3_ratio: '3yr Peak (ratio)',
+  career_pts: 'Career Points', top12_rate: 'Top-12 Rate'
+};
+
+function compositeScore(row, position){
+  // Percentile rank of this player's predicted values against every same-position
+  // player's predicted values, averaged across the 4 targets. All computed client-side
+  // from the already-loaded database — no server, no pre-baked percentile tables.
+  const samePos = researchDB.filter(r => r.position === position);
+  const pcts = [];
+  PREDICT_TARGETS.forEach(t => {
+    const mine = runModel(row, position, t);
+    if(mine == null) return;
+    const all = samePos.map(r => runModel(r, position, t)).filter(v => v != null);
+    if(!all.length) return;
+    const below = all.filter(v => v <= mine).length;
+    pcts.push(below / all.length * 100);
+  });
+  if(!pcts.length) return null;
+  return pcts.reduce((a,b)=>a+b,0) / pcts.length;
+}
+
+function tierForComposite(score){
+  if(score >= 90) return 'Elite';
+  if(score >= 75) return 'Great';
+  if(score >= 50) return 'Good';
+  if(score >= 25) return 'Okay';
+  if(score >= 10) return 'Bad';
+  return 'Terrible';
+}
+
+function renderPredictorCard(row){
+  const position = row.position;
+  const name = row.player_display_name || row.draft_pfr_player_name || '(unnamed)';
+  const composite = compositeScore(row, position);
+  const tier = composite != null ? tierForComposite(composite) : null;
+
+  const hasActuals = row.games > 0 && row.ceiling_season_rank != null;
+  const noteHtml = hasActuals
+    ? ''
+    : `<div class="predictor-note">No career data yet (rookie or hasn't reached the field) — showing model predictions only, based on draft profile.</div>`;
+
+  const rows = PREDICT_TARGETS.map(t => {
+    const pred = runModel(row, position, t);
+    let actual = null;
+    if(t === 'ceiling_inv' && row.ceiling_season_rank != null) actual = -row.ceiling_season_rank;
+    if(t === 'peak3_ratio' && row.peak3_ratio != null) actual = row.peak3_ratio;
+    if(t === 'career_pts' && row.career_pts != null) actual = row.career_pts;
+    if(t === 'top12_rate' && row.top12_rate != null) actual = row.top12_rate;
+    const fmt = v => v == null ? '—' : (Math.abs(v) < 5 ? v.toFixed(2) : Math.round(v).toLocaleString('en-US'));
+    return `<tr>
+      <td>${PREDICT_LABELS[t]}</td>
+      <td class="num predicted">${fmt(pred)}</td>
+      <td class="num actual">${fmt(actual)}</td>
+    </tr>`;
+  }).join('');
+
+  const preds = predictModel.predictors;
+  const inputsHtml = preds.map(p => {
+    let v = p === 'combine_ht_in' ? row['combine_ht'] : row[p];
+    const missing = (v == null || v === '');
+    const label = p.replace('draft_','').replace('combine_','').replace('_',' ');
+    return `<div class="pi ${missing?'missing':''}"><span class="lbl">${label}:</span> ${missing ? 'n/a (imputed)' : v}</div>`;
+  }).join('');
+
+  document.getElementById('predictorCard').innerHTML = `
+    <div class="predictor-card">
+      <div class="phead">
+        <div>
+          <div class="pname">${name}</div>
+          <div class="psub">${position} · drafted ${row.draft_season || '?'} · round ${row.draft_round || '?'}, pick ${row.draft_pick || '?'}</div>
+        </div>
+        ${composite != null ? `<div class="composite-box"><div class="score">${Math.round(composite)}</div><div class="tier">${tier}</div></div>` : ''}
+      </div>
+      ${noteHtml}
+      <table class="predict-table">
+        <thead><tr><th>Target</th><th style="text-align:right;">Predicted</th><th style="text-align:right;">Actual</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="section-label" style="margin-top:0;">Inputs used</div>
+      <div class="predictor-inputs">${inputsHtml}</div>
+    </div>
+  `;
+}
+
+document.getElementById('predictorSearch').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  const resultsEl = document.getElementById('predictorResults');
+  if(!researchDB){ return; }
+  if(q.length < 2){ resultsEl.innerHTML = ''; return; }
+  const matches = researchDB.filter(r => {
+    const name = (r.player_display_name || r.draft_pfr_player_name || '').toLowerCase();
+    return name.includes(q);
+  }).slice(0, 8);
+  resultsEl.innerHTML = matches.map((r, i) => {
+    const name = r.player_display_name || r.draft_pfr_player_name || '(unnamed)';
+    return `<div class="predictor-result-row" data-idx="${researchDB.indexOf(r)}">
+      ${name}<div class="sub">${r.position} · drafted ${r.draft_season || '?'} · ${r.draft_team || ''}</div>
+    </div>`;
+  }).join('') || '<div class="empty">No matches</div>';
+
+  resultsEl.querySelectorAll('.predictor-result-row').forEach(el => {
+    el.addEventListener('click', () => {
+      const row = researchDB[parseInt(el.dataset.idx)];
+      renderPredictorCard(row);
+    });
+  });
+});
 
 document.getElementById('fetchBtn').addEventListener('click', pullLatest);
 renderFilters();
