@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fantasy Command Center</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --bg:#F7F9FB;
+    --surface:#FFFFFF;
+    --surface-raised:#F1F4F8;
+    --line:#E1E6ED;
+    --chalk:#101828;
+    --muted:#667085;
+    --accent:#0D9488;
+    --accent-dim:#CCFBF1;
+    --alert:#DC2626;
+    --good:#059669;
+    --mine-red:#DC2626;
+    --op-blue:#2563EB;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--chalk);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    padding:0;
+  }
+  .version-tag{
+    font-family:ui-monospace,'Consolas',monospace;
+    font-size:11px;
+    color:var(--muted);
+    background:var(--surface-raised);
+    border:1px solid var(--line);
+    padding:2px 7px;
+    border-radius:3px;
+    letter-spacing:0.5px;
+    margin-left:10px;
+    vertical-align:middle;
+  }
+  .scorebug{
+    background:var(--surface-raised);
+    border-bottom:3px solid var(--accent);
+    padding:14px 20px 14px 70px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .scorebug .league-name{
+    font-weight:800;
+    letter-spacing:0.5px;
+    font-size:20px;
+    text-transform:uppercase;
+  }
+  .scorebug .meta{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    font-size:12px;
+    color:var(--muted);
+    letter-spacing:0.5px;
+  }
+  .team-strip{
+    display:flex;
+    gap:16px;
+    align-items:baseline;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  .team-strip .name{font-size:15px;font-weight:700;color:var(--accent);}
+  .team-strip .record{font-size:15px;color:var(--chalk);}
+  .controls{
+    padding:12px 20px;
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+    border-bottom:1px solid var(--line);
+  }
+  input[type=text]{
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--chalk);
+    padding:8px 10px;
+    border-radius:3px;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    font-size:13px;
+  }
+  select{
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--chalk);
+    padding:8px 10px;
+    border-radius:3px;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    font-size:13px;
+  }
+  button{
+    background:var(--accent);
+    color:#FFFFFF;
+    border:none;
+    padding:8px 16px;
+    border-radius:3px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    font-size:12px;
+    cursor:pointer;
+  }
+  button:hover{background:#0F766E;}
+  button:disabled{background:var(--accent-dim);cursor:default;}
+  .status{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    font-size:12px;
+    color:var(--muted);
+  }
+  .filters-wrap{
+    padding:16px 20px 0 20px;
+  }
+  .filter-row-label{
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  .value-filters, .own-filters{
+    display:flex;
+    gap:6px;
+    margin-bottom:14px;
+    flex-wrap:wrap;
+  }
+  .value-filter, .own-filter{
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--muted);
+    padding:6px 14px;
+    border-radius:20px;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    cursor:pointer;
+  }
+  .value-filter.active{background:var(--accent);color:#FFFFFF;border-color:var(--accent);}
+  .own-filter.active{background:var(--accent-dim);color:var(--chalk);border-color:var(--accent);}
+  .board{
+    display:grid;
+    grid-template-columns:repeat(7, minmax(160px, 1fr));
+    gap:0;
+    padding:0 20px 24px 20px;
+    overflow-x:auto;
+  }
+  .col{
+    border-right:1px solid var(--line);
+    padding:0 8px;
+    min-width:160px;
+  }
+  .col:last-child{border-right:none;}
+  .col-head{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    color:var(--accent);
+    font-weight:700;
+    padding:10px 4px;
+    border-bottom:2px solid var(--line);
+    margin-bottom:8px;
+    text-align:center;
+  }
+  .prow{box-shadow:0 1px 2px rgba(16,24,40,0.06);
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-left:3px solid var(--mine-red);
+    border-radius:3px;
+    padding:8px 9px;
+    margin-bottom:6px;
+  }
+  .prow.own-op{border-left-color:var(--op-blue);}
+  .prow.own-fa{border-left-color:transparent;}
+  .prow .pname{
+    font-size:12.5px;
+    font-weight:700;
+    line-height:1.25;
+  }
+  .prow .psub{
+    font-size:10px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+  .prow .injury{
+    color:var(--alert);
+    font-weight:700;
+    font-size:10px;
+    margin-left:4px;
+  }
+  .prow .pval{
+    margin-top:5px;
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:11.5px;
+    color:var(--good);
+  }
+  .prow .pval.na{color:var(--muted);}
+  .spread-tag{color:var(--muted);font-weight:400;}
+  .rank-tag{color:#2563EB;font-weight:700;}
+  .own-tag{
+    display:inline-block;
+    margin-top:4px;
+    font-size:9px;
+    padding:1px 5px;
+    border-radius:2px;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    font-weight:700;
+  }
+  .own-tag.mine{background:var(--accent-dim);color:var(--chalk);}
+  .own-tag.op{background:var(--surface-raised);color:var(--muted);border:1px solid var(--line);}
+  .own-tag.fa{background:#DBEAFE;color:#1E40AF;}
+  .view-toggle{
+    display:flex;
+    gap:6px;
+    padding:10px 20px 0 20px;
+  }
+  .view-btn{
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--muted);
+    padding:8px 18px;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    cursor:pointer;
+    border-radius:3px 3px 0 0;
+  }
+  .view-btn.active{background:var(--accent);color:#FFFFFF;border-color:var(--accent);}
+  .view-panel{display:none;}
+  .view-panel.active{display:block;}
+  .predictor-wrap{padding:20px;max-width:900px;}
+  .predictor-search{
+    width:100%;
+    max-width:420px;
+    margin-bottom:10px;
+  }
+  .predictor-results{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    max-width:420px;
+    margin-bottom:20px;
+  }
+  .predictor-result-row{box-shadow:0 1px 2px rgba(16,24,40,0.06);
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:8px 12px;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .predictor-result-row:hover{border-color:var(--accent);}
+  .predictor-result-row .sub{font-size:11px;color:var(--muted);}
+  .predictor-card{box-shadow:0 1px 2px rgba(16,24,40,0.06);
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:20px;
+  }
+  .predictor-card .phead{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .predictor-card .pname{font-size:20px;font-weight:800;}
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  .composite-box{
+    text-align:center;
+    background:var(--surface-raised);
+    border-radius:4px;
+    padding:12px 20px;
+    min-width:110px;
+  }
+  .composite-box .score{font-size:32px;font-weight:800;color:var(--accent);}
+  .composite-box .tier{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:2px;}
+  .predictor-note{
+    font-size:11px;
+    color:var(--muted);
+    background:var(--surface-raised);
+    border-left:3px solid var(--op-blue);
+    padding:8px 12px;
+    margin-bottom:16px;
+    border-radius:0 3px 3px 0;
+  }
+  .predict-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;}
+  .predict-table th,.predict-table td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);}
+  .predict-table th{color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:1px;}
+  .predict-table td.num{font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;text-align:right;}
+  .predict-table td.actual{color:var(--good);}
+  .predict-table td.predicted{color:var(--accent);}
+  .predictor-inputs{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+    gap:8px;
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:11px;
+  }
+  .predictor-inputs .pi{background:var(--surface-raised);border-radius:3px;padding:6px 8px;}
+  .predictor-inputs .pi .lbl{color:var(--muted);}
+  .predictor-inputs .pi.missing{opacity:0.4;}
+
+  .empty{
+    color:var(--muted);
+    font-size:12px;
+    padding:16px 0;
+    text-align:center;
+  }
+  .tier-divider{
+    font-size:9px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--muted);
+    border-top:1px dashed var(--line);
+    padding-top:6px;
+    margin:2px 0 6px 0;
+  }
+  .yr-row{box-shadow:0 1px 2px rgba(16,24,40,0.06);
+    display:grid;
+    grid-template-columns:30px 1fr 60px 90px 60px;
+    align-items:center;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:8px 12px;
+    margin-bottom:5px;
+    font-size:13px;
+    cursor:pointer;
+    gap:8px;
+  }
+  .yr-row:hover{border-color:var(--accent);}
+  .yr-row .rk{color:var(--muted);font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;}
+  .yr-row .sc{font-weight:800;color:var(--accent);text-align:right;font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;}
+  .uncertainty-note{
+    font-size:11px;
+    color:var(--muted);
+    background:var(--surface-raised);
+    border-left:3px solid var(--gold, #C9A227);
+    padding:8px 12px;
+    margin-top:10px;
+    border-radius:0 3px 3px 0;
+  }
+  .override-row{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    margin-top:6px;
+  }
+  .override-row input{width:80px;padding:4px 6px;font-size:11px;}
+  .override-row button{padding:4px 10px;font-size:10px;}
+  .error-box{
+    background:rgba(229,72,77,0.12);
+    border:1px solid var(--alert);
+    color:#991B1B;
+    padding:12px 14px;
+    border-radius:3px;
+    font-size:13px;
+    margin:0 20px 16px 20px;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+</style>
+</head>
+<body>
+
+<div class="scorebug">
+  <div>
+    <div style="display:flex;align-items:baseline;">
+      <div class="league-name" id="leagueName">Fantasy Command Center</div><span class="version-tag">v0.7</span>
+    </div>
+    <div class="meta" id="leagueMeta">not loaded yet</div>
+  </div>
+  <div class="team-strip" id="teamStrip"></div>
+</div>
+
+<div class="controls">
+  <select id="leagueSelect" style="display:none;"></select>
+  <input type="text" id="usernameInput" placeholder="Sleeper username">
+  <input type="text" id="leagueIdInput" placeholder="League ID" style="width:220px;">
+  <input type="text" id="leagueLabelInput" placeholder="Label (e.g. Main Dynasty)" style="width:160px;">
+  <button id="saveLeagueBtn" style="background:var(--surface);color:var(--chalk);border:1px solid var(--line);">Save League</button>
+  <button id="fetchBtn">Pull latest</button>
+  <span class="status" id="statusLine">enter league info and pull latest, or pick a saved league above</span>
+</div>
+
+<div id="errorBox"></div>
+
+<div class="filters-wrap">
+  <div class="filter-row-label">Value</div>
+  <div class="value-filters" id="valueFilters"></div>
+  <div class="filter-row-label">Show</div>
+  <div class="own-filters" id="ownFilters"></div>
+</div>
+
+<div class="view-toggle">
+  <div class="view-btn active" data-view="board">Roster Board</div>
+  <div class="view-btn" data-view="predictor">Player Predictor</div>
+</div>
+
+<div class="view-panel active" id="view-board">
+<div class="board" id="board">
+  <div class="empty">No data yet — pull latest to load the board.</div>
+</div>
+</div>
+
+<div class="view-panel" id="view-predictor">
+  <div class="predictor-wrap">
+    <div class="value-filters" style="margin-bottom:14px;">
+      <div class="value-filter active" data-predmode="search" id="predModeSearch">Search Player</div>
+      <div class="value-filter" data-predmode="year" id="predModeYear">Browse by Draft Year</div>
+    </div>
+
+    <div id="predSearchMode">
+      <input type="text" class="predictor-search" id="predictorSearch" placeholder="Search any player, 1999-present, or a 2026 rookie...">
+      <div class="predictor-results" id="predictorResults"></div>
+    </div>
+
+    <div id="predYearMode" style="display:none;">
+      <select id="yearSelect" style="margin-bottom:14px;"></select>
+      <div id="yearLeaderboard"></div>
+    </div>
+
+    <div id="predictorCard"></div>
+  </div>
+</div>
+
+<script>
+const API = 'https://api.sleeper.app/v1';
+const DP_VALUES_URL = 'https://raw.githubusercontent.com/DynastyProcess/data/master/files/values-players.csv';
+const DP_WEEKLY_URL = 'https://raw.githubusercontent.com/DynastyProcess/data/master/files/fp_latest_weekly.csv';
+const RESEARCH_DB_URL = 'https://raw.githubusercontent.com/snipesmcgeee/ffb-research/main/ffb_research_database.csv';
+const MODEL_URL = 'https://raw.githubusercontent.com/snipesmcgeee/ffb-research/main/model_coefficients.json';
+
+let researchDB = null;   // parsed rows from ffb_research_database.csv
+let predictModel = null; // parsed model_coefficients.json
+
+document.querySelectorAll('.view-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-' + btn.dataset.view).classList.add('active');
+    if(btn.dataset.view === 'predictor') loadResearchDataOnce();
+  });
+});
+
+let players = null;
+let activeValueFilter = 'dynasty'; // 'dynasty' | 'season' | 'weekly'
+let activeOwnFilters = new Set(['mine','fa','rostered']); // multi-select
+let lastData = null;
+
+function setStatus(msg){ document.getElementById('statusLine').textContent = msg; }
+function showError(msg){
+  document.getElementById('errorBox').innerHTML = msg
+    ? `<div class="error-box">${msg}</div>` : '';
+}
+
+async function getJSON(url){
+  const res = await fetch(url);
+  if(!res.ok) throw new Error(`${url} returned ${res.status}`);
+  return res.json();
+}
+
+async function loadPlayersOnce(){
+  if(players) return players;
+  setStatus('downloading player database (first time only, ~large file)...');
+  players = await getJSON(`${API}/players/nfl`);
+  return players;
+}
+
+// Sleeper's projections endpoint isn't in their official public docs anymore —
+// it's a community-known endpoint that may change or disappear. Fail soft.
+async function fetchProjectionsSafe(season, week){
+  const urls = [
+    `${API}/projections/nfl/regular/${season}/${week}`,
+    `https://api.sleeper.com/projections/nfl/${season}/${week}?season_type=regular`
+  ];
+  for(const url of urls){
+    try{
+      const data = await getJSON(url);
+      if(data && typeof data === 'object') return data;
+    }catch(e){ /* try next */ }
+  }
+  return null;
+}
+
+function projPoints(projEntry, isHalfPpr){
+  if(!projEntry) return null;
+  const stats = projEntry.stats || projEntry;
+  if(isHalfPpr && stats.pts_half_ppr != null) return stats.pts_half_ppr;
+  if(stats.pts_ppr != null) return stats.pts_ppr;
+  if(stats.pts_std != null) return stats.pts_std;
+  return null;
+}
+
+// Full injury status text -> short code shown on the card
+const INJURY_CODES = {
+  'Questionable':'Q','Doubtful':'D','Out':'O','IR':'IR','PUP':'PUP',
+  'Suspended':'SUS','NA':'NA','Sus':'SUS'
+};
+function injuryCode(status){
+  if(!status) return null;
+  return INJURY_CODES[status] || status.slice(0,3).toUpperCase();
+}
+
+function fmtNum(n){ return Math.round(n).toLocaleString('en-US'); }
+
+// Tier 1 = 10,000+, each tier down is another 500 points, per Jack's scale.
+function tierFor(value){
+  if(value == null) return null;
+  const diff = 10000 - value;
+  if(diff <= 0) return 1;
+  return 1 + Math.ceil(diff / 500);
+}
+
+function normName(name){
+  if(!name) return '';
+  return name.toLowerCase()
+    .replace(/[.']/g, '')
+    .replace(/\b(jr|sr|ii|iii|iv|v)\b/g, '')
+    .replace(/[^a-z ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function fetchFantasyCalcSafe(numQbs){
+  try{
+    const url = `https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=${numQbs}&numTeams=10&ppr=0.5`;
+    const data = await getJSON(url);
+    const map = {};
+    (data || []).forEach(row => {
+      const sid = row.player && row.player.sleeperId;
+      if(sid) map[sid] = { dynasty: row.value, redraft: row.redraftValue, posRank: row.positionRank };
+    });
+    return map;
+  }catch(e){
+    console.error('FantasyCalc fetch failed', e);
+    return null;
+  }
+}
+
+async function fetchDynastyProcessSafe(numQbs){
+  try{
+    const res = await fetch(DP_VALUES_URL);
+    if(!res.ok) throw new Error(`DP values returned ${res.status}`);
+    const text = await res.text();
+    const parsed = Papa.parse(text, { header: true, dynamicTyping: true, skipEmptyLines: true });
+    const valueField = numQbs >= 2 ? 'value_2qb' : 'value_1qb';
+    const map = {};
+    parsed.data.forEach(row => {
+      if(!row.player) return;
+      const val = row[valueField];
+      if(val == null) return;
+      map[normName(row.player)] = { value: val, posRank: row.ecr_pos };
+    });
+    return map;
+  }catch(e){
+    console.error('DynastyProcess fetch failed', e);
+    return null;
+  }
+}
+
+// Republished FantasyPros weekly start/sit data. Only refreshes once the regular season is
+// underway — during offseason/preseason it's stale (last season's final week). Scrape date
+// is surfaced on the card so staleness is visible, not hidden.
+async function fetchDynastyProcessWeeklySafe(){
+  try{
+    const res = await fetch(DP_WEEKLY_URL);
+    if(!res.ok) throw new Error(`DP weekly returned ${res.status}`);
+    const text = await res.text();
+    const parsed = Papa.parse(text, { header: true, dynamicTyping: true, skipEmptyLines: true });
+    const map = {};
+    parsed.data.forEach(row => {
+      if(!row.player_name) return;
+      map[normName(row.player_name)] = {
+        posRank: row.pos_rank, grade: row.start_sit_grade, pts: row.r2p_pts, scrapeDate: row.scrape_date
+      };
+    });
+    return map;
+  }catch(e){
+    console.error('DynastyProcess weekly fetch failed', e);
+    return null;
+  }
+}
+
+function buildValuesMap(playerMap, fcMap, dpNameMap, dpWeeklyMap){
+  const out = {};
+  Object.keys(playerMap).forEach(id => {
+    const p = playerMap[id];
+    if(!p || !p.position) return;
+    const entry = {};
+    if(fcMap && fcMap[id]){
+      entry.fcDynasty = fcMap[id].dynasty;
+      entry.fcRedraft = fcMap[id].redraft;
+      entry.fcPosRank = fcMap[id].posRank;
+    }
+    const name = p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : p.full_name;
+    const key = normName(name);
+    if(dpNameMap && dpNameMap[key]){
+      entry.dpDynasty = dpNameMap[key].value;
+      entry.dpPosRank = dpNameMap[key].posRank;
+    }
+    if(dpWeeklyMap && dpWeeklyMap[key]) entry.dpWeekly = dpWeeklyMap[key];
+    if(Object.keys(entry).length) out[id] = entry;
+  });
+  return out;
+}
+
+function dynastyBlend(entry){
+  if(!entry) return null;
+  const vals = [];
+  if(entry.fcDynasty != null) vals.push(entry.fcDynasty);
+  if(entry.dpDynasty != null) vals.push(entry.dpDynasty);
+  if(!vals.length) return null;
+  const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
+  let halfSpread = null;
+  if(vals.length === 2) halfSpread = Math.round(Math.abs(vals[0]-vals[1]) / 2);
+  return { avg, halfSpread };
+}
+
+function rankBadge(position, entry){
+  if(!entry) return null;
+  const ranks = [];
+  if(entry.fcPosRank != null) ranks.push(entry.fcPosRank);
+  if(entry.dpPosRank != null) ranks.push(entry.dpPosRank);
+  if(!ranks.length) return null;
+  const avg = ranks.reduce((a,b)=>a+b,0) / ranks.length;
+  return `${position}${avg.toFixed(1)}`;
+}
+
+function valueFor(id, filter, valuesMap, projMap, isHalfPpr){
+  const entry = valuesMap ? valuesMap[id] : null;
+  if(filter === 'dynasty'){
+    const b = dynastyBlend(entry);
+    return b ? b.avg : null;
+  }
+  if(filter === 'season'){
+    return entry && entry.fcRedraft != null ? entry.fcRedraft : null;
+  }
+  return projMap ? projPoints(projMap[id], isHalfPpr) : null;
+}
+
+function valueHtml(id, valuesMap, projMap, isHalfPpr, projLabel, filter){
+  const entry = valuesMap ? valuesMap[id] : null;
+  if(filter === 'dynasty'){
+    const b = dynastyBlend(entry);
+    if(!b) return `<div class="pval na">Dyn: —</div>`;
+    const spreadHtml = b.halfSpread != null ? ` <span class="spread-tag">(${fmtNum(b.halfSpread)})</span>` : '';
+    return `<div class="pval">Dyn: ${fmtNum(b.avg)}${spreadHtml}</div>`;
+  }
+  if(filter === 'season'){
+    if(!entry || entry.fcRedraft == null) return `<div class="pval na">Ssn: —</div>`;
+    return `<div class="pval">Ssn: ${fmtNum(entry.fcRedraft)}</div>`;
+  }
+  // weekly
+  const pts = projMap ? projPoints(projMap[id], isHalfPpr) : null;
+  let html = pts != null
+    ? `<div class="pval">${projLabel}: ${pts.toFixed(1)}</div>`
+    : `<div class="pval na">${projLabel}: —</div>`;
+  if(entry && entry.dpWeekly){
+    const w = entry.dpWeekly;
+    const parts = [];
+    if(w.posRank) parts.push(w.posRank);
+    if(w.grade) parts.push(`Grade ${w.grade}`);
+    if(parts.length) html += `<div class="psub">FP (${w.scrapeDate}): ${parts.join(' · ')}</div>`;
+  }
+  return html;
+}
+
+const POSITIONS = ['QB','RB','WR','FLEX','TE'];
+const FLEX_ELIGIBLE = ['RB','WR','TE'];
+
+function ownershipOf(playerId, myIds, rosteredIds){
+  if(myIds.has(playerId)) return 'mine';
+  if(rosteredIds.has(playerId)) return 'rostered';
+  return 'fa';
+}
+
+function ownTagHtml(kind, opTeamName){
+  if(kind === 'mine') return `<span class="own-tag mine">MINE</span>`;
+  if(kind === 'rostered') return `<span class="own-tag op">${opTeamName || 'OTHER TEAM'}</span>`;
+  return `<span class="own-tag fa">FA</span>`;
+}
+
+function rowHtml(p, valuesMap, projMap, isHalfPpr, projLabel, filter, ownKind, opTeamName){
+  const name = p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : p.full_name;
+  const team = p.team || 'FA';
+  const code = injuryCode(p.injury_status);
+  const injury = code ? `<span class="injury">${code}</span>` : '';
+  const badge = rankBadge(p.position, valuesMap ? valuesMap[p.player_id] : null);
+  const rowCls = ownKind === 'rostered' ? 'own-op' : (ownKind === 'fa' ? 'own-fa' : '');
+  return `<div class="prow ${rowCls}">
+    <div class="pname">${name}${injury}</div>
+    <div class="psub">${p.position} · ${team}${badge ? ` · <span class="rank-tag">${badge}</span>` : ''}</div>
+    ${valueHtml(p.player_id, valuesMap, projMap, isHalfPpr, projLabel, filter)}
+    ${ownTagHtml(ownKind, opTeamName)}
+  </div>`;
+}
+
+function renderBoard(){
+  if(!lastData) return;
+  const { playerMap, valuesMap, projMap, isHalfPpr, projLabel, myIds, rosteredIds, rosterOwnerByPlayer } = lastData;
+
+  // Build eligible pool per column, filtered by active ownership toggles
+  const pools = {};
+  POSITIONS.forEach(pos => pools[pos] = []);
+
+  Object.values(playerMap).forEach(p => {
+    if(!p || !p.position) return;
+    const kind = ownershipOf(p.player_id, myIds, rosteredIds);
+    if(!activeOwnFilters.has(kind === 'mine' ? 'mine' : (kind === 'rostered' ? 'rostered' : 'fa'))) return;
+
+    // Free agents: exclude anyone with no current NFL team (fixes name-collision
+    // ghosts in Sleeper's player list — e.g. inactive/practice-squad namesakes)
+    if(kind === 'fa' && !p.team) return;
+    if(kind === 'fa' && !['Active'].includes(p.status) && p.position !== 'DEF') return;
+
+    if(p.position === 'QB' || p.position === 'RB' || p.position === 'WR' || p.position === 'TE'){
+      pools[p.position].push({p, kind});
+    }
+    if(FLEX_ELIGIBLE.includes(p.position)){
+      pools['FLEX'].push({p, kind});
+    }
+  });
+
+  const boardHtml = POSITIONS.map(pos => {
+    const list = pools[pos].slice().sort((a,b) => {
+      const va = valueFor(a.p.player_id, activeValueFilter, valuesMap, projMap, isHalfPpr);
+      const vb = valueFor(b.p.player_id, activeValueFilter, valuesMap, projMap, isHalfPpr);
+      if(va != null && vb != null) return vb - va;
+      if(va != null) return -1;
+      if(vb != null) return 1;
+      return (a.p.search_rank||9999) - (b.p.search_rank||9999);
+    }).slice(0, 40); // cap per column for render performance
+
+    const rows = [];
+    let lastTier = null;
+    const tieringActive = (activeValueFilter === 'dynasty' || activeValueFilter === 'season');
+    list.forEach(({p, kind}) => {
+      if(tieringActive){
+        const val = valueFor(p.player_id, activeValueFilter, valuesMap, projMap, isHalfPpr);
+        const tier = tierFor(val);
+        if(tier != null && tier !== lastTier){
+          rows.push(`<div class="tier-divider">Tier ${tier}</div>`);
+          lastTier = tier;
+        }
+      }
+      const opTeamName = kind === 'rostered' ? rosterOwnerByPlayer[p.player_id] : null;
+      rows.push(rowHtml(p, valuesMap, projMap, isHalfPpr, projLabel, activeValueFilter, kind, opTeamName));
+    });
+    const rowsHtml = rows.join('');
+
+    return `<div class="col">
+      <div class="col-head">${pos}</div>
+      ${rowsHtml || '<div class="empty">None</div>'}
+    </div>`;
+  }).join('');
+
+  document.getElementById('board').innerHTML = boardHtml;
+}
+
+function renderFilters(){
+  const vf = document.getElementById('valueFilters');
+  vf.innerHTML = ['dynasty','season','weekly'].map(f => {
+    const label = f === 'dynasty' ? 'Dynasty Value' : (f === 'season' ? 'Season Value' : 'Weekly Value');
+    return `<div class="value-filter ${activeValueFilter===f?'active':''}" data-filter="${f}">${label}</div>`;
+  }).join('');
+  vf.querySelectorAll('.value-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeValueFilter = btn.dataset.filter;
+      renderFilters();
+      renderBoard();
+    });
+  });
+
+  const of = document.getElementById('ownFilters');
+  of.innerHTML = [['mine','My Team'],['fa','Free Agents'],['rostered','Rostered']].map(([key,label]) => {
+    return `<div class="own-filter ${activeOwnFilters.has(key)?'active':''}" data-own="${key}">${label}</div>`;
+  }).join('');
+  of.querySelectorAll('.own-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.own;
+      if(activeOwnFilters.has(key)) activeOwnFilters.delete(key); else activeOwnFilters.add(key);
+      renderFilters();
+      renderBoard();
+    });
+  });
+}
+
+async function pullLatest(){
+  const username = document.getElementById('usernameInput').value.trim();
+  const leagueId = document.getElementById('leagueIdInput').value.trim();
+  const btn = document.getElementById('fetchBtn');
+  showError('');
+
+  if(!username || !leagueId){
+    showError('Enter both a username and a league ID.');
+    return;
+  }
+
+  btn.disabled = true;
+  try{
+    setStatus('looking up user...');
+    const user = await getJSON(`${API}/user/${username}`);
+    if(!user || !user.user_id) throw new Error('User not found on Sleeper.');
+
+    setStatus('loading league...');
+    const league = await getJSON(`${API}/league/${leagueId}`);
+
+    setStatus('loading rosters and managers...');
+    const [rosters, usersArr, state] = await Promise.all([
+      getJSON(`${API}/league/${leagueId}/rosters`),
+      getJSON(`${API}/league/${leagueId}/users`),
+      getJSON(`${API}/state/nfl`)
+    ]);
+
+    const usersById = {};
+    usersArr.forEach(u => usersById[u.user_id] = u);
+
+    const myRoster = rosters.find(r => r.owner_id === user.user_id);
+    if(!myRoster) throw new Error('Could not find a roster owned by this username in this league.');
+
+    const playerMap = await loadPlayersOnce();
+
+    const currentWeek = state.display_week || state.week || state.leg || 1;
+    const recPpr = league.scoring_settings && league.scoring_settings.rec;
+    const isHalfPpr = recPpr === 0.5;
+    const projLabel = `Wk ${currentWeek}`;
+
+    const qbSlots = (league.roster_positions || []).filter(p => p === 'QB').length;
+    const numQbs = qbSlots >= 2 ? 2 : 1;
+
+    setStatus(`loading week ${currentWeek} projections + trade values...`);
+    const [projMap, fcMap, dpNameMap, dpWeeklyMap] = await Promise.all([
+      fetchProjectionsSafe(league.season, currentWeek),
+      fetchFantasyCalcSafe(numQbs),
+      fetchDynastyProcessSafe(numQbs),
+      fetchDynastyProcessWeeklySafe()
+    ]);
+
+    const valuesMap = buildValuesMap(playerMap, fcMap, dpNameMap, dpWeeklyMap);
+
+    document.getElementById('leagueName').textContent = league.name || 'Fantasy Command Center';
+    document.getElementById('leagueMeta').textContent =
+      `${league.season} season · ${state.season_type} · week ${currentWeek} · ${league.total_rosters} teams`;
+
+    const myUser = usersById[user.user_id] || {};
+    const myTeamName = (myUser.metadata && myUser.metadata.team_name) || myUser.display_name || username;
+    const rec = `${myRoster.settings.wins || 0}-${myRoster.settings.losses || 0}`;
+    document.getElementById('teamStrip').innerHTML =
+      `<span class="name">${myTeamName}</span><span class="record">${rec}</span>`;
+
+    const myIds = new Set(myRoster.players || []);
+    const rosteredIds = new Set();
+    const rosterOwnerByPlayer = {};
+    rosters.forEach(r => {
+      if(r.roster_id === myRoster.roster_id) return;
+      const u = usersById[r.owner_id] || {};
+      const teamName = (u.metadata && u.metadata.team_name) || u.display_name || 'Other Team';
+      (r.players || []).forEach(id => {
+        rosteredIds.add(id);
+        rosterOwnerByPlayer[id] = teamName;
+      });
+    });
+
+    lastData = { playerMap, valuesMap, projMap, isHalfPpr, projLabel, myIds, rosteredIds, rosterOwnerByPlayer };
+    renderFilters();
+    renderBoard();
+
+    // no separate save-on-pull needed — saving a league is an explicit action (Save League
+    // button) now, not an implicit side effect of every pull, since profiles are shared
+    // across multiple leagues/people using this same page
+
+    const warnings = [];
+    if(!projMap) warnings.push('weekly projections unavailable');
+    if(!fcMap) warnings.push('FantasyCalc unavailable');
+    if(!dpNameMap) warnings.push('DynastyProcess unavailable');
+    if(!dpWeeklyMap) warnings.push('DP weekly start/sit unavailable');
+    setStatus(`updated ${new Date().toLocaleTimeString()}${warnings.length ? ' — ' + warnings.join(', ') : ''}`);
+  }catch(err){
+    console.error(err);
+    showError(`Couldn't load data: ${err.message}. If this keeps happening, the Sleeper API may be unreachable from here — paste roster info manually instead and I'll work with that.`);
+    setStatus('load failed');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+// ===================== Player Predictor =====================
+
+async function loadResearchDataOnce(){
+  if(researchDB && predictModel) return;
+  const resultsEl = document.getElementById('predictorResults');
+  resultsEl.innerHTML = '<div class="empty">Loading research database...</div>';
+  try{
+    const [csvText, modelJson] = await Promise.all([
+      fetch(RESEARCH_DB_URL).then(r => r.text()),
+      fetch(MODEL_URL).then(r => r.json())
+    ]);
+    const parsed = Papa.parse(csvText, { header: true, dynamicTyping: true, skipEmptyLines: true });
+    researchDB = parsed.data;
+    predictModel = modelJson;
+    resultsEl.innerHTML = '';
+  }catch(e){
+    console.error('Research data load failed', e);
+    resultsEl.innerHTML = '<div class="empty">Couldn\'t load the research database or model from ffb-research. Check the repo is public and the files are named correctly.</div>';
+  }
+}
+
+// Manual overrides for missing predictor values, keyed by player_id, persisted so they
+// survive a page reload. This exists because some legitimate data gaps (a rookie who
+// skipped the combine, nflverse not having caught up yet) shouldn't force imputation
+// forever if you actually know the real number.
+const OVERRIDES_KEY = 'ffb-predictor-overrides';
+function getOverrides(){
+  try{ return JSON.parse(localStorage.getItem(OVERRIDES_KEY) || '{}'); }catch(e){ return {}; }
+}
+function setOverride(playerId, field, value){
+  const o = getOverrides();
+  if(!o[playerId]) o[playerId] = {};
+  o[playerId][field] = value;
+  try{ localStorage.setItem(OVERRIDES_KEY, JSON.stringify(o)); }catch(e){ /* fail soft */ }
+}
+function effectiveRow(row){
+  const o = getOverrides()[row.player_id];
+  if(!o) return row;
+  return Object.assign({}, row, o);
+}
+
+// Apply the stored regression: impute missing predictors with training-set means,
+// standardize, dot with coefficients + intercept.
+function runModel(row, position, target){
+  const m = predictModel.models[position] && predictModel.models[position][target];
+  if(!m) return null;
+  row = effectiveRow(row);
+  const preds = predictModel.predictors;
+  const x = preds.map((p, i) => {
+    let v = row[p];
+    if(v == null || v === '' || isNaN(v)) v = m.impute_mean[i];
+    return v;
+  });
+  const xs = x.map((v, i) => (v - m.scaler_mean[i]) / m.scaler_scale[i]);
+  let out = m.intercept;
+  for(let i=0;i<xs.length;i++) out += xs[i]*m.coef[i];
+  return out;
+}
+
+const PREDICT_TARGETS = ['ceiling_inv','peak3_ratio','career_pts','top12_rate'];
+const PREDICT_LABELS = {
+  ceiling_inv: 'Ceiling (best season)', peak3_ratio: '3yr Peak (ratio)',
+  career_pts: 'Career Points', top12_rate: 'Top-12 Rate'
+};
+
+function compositeScore(row, position){
+  // Percentile rank of this player's predicted values against every same-position
+  // player's predicted values, averaged across the 4 targets. All computed client-side
+  // from the already-loaded database — no server, no pre-baked percentile tables.
+  const samePos = researchDB.filter(r => r.position === position);
+  const pcts = [];
+  PREDICT_TARGETS.forEach(t => {
+    const mine = runModel(row, position, t);
+    if(mine == null) return;
+    const all = samePos.map(r => runModel(r, position, t)).filter(v => v != null);
+    if(!all.length) return;
+    const below = all.filter(v => v <= mine).length;
+    pcts.push(below / all.length * 100);
+  });
+  if(!pcts.length) return null;
+  return pcts.reduce((a,b)=>a+b,0) / pcts.length;
+}
+
+function tierForComposite(score){
+  if(score >= 90) return 'Elite';
+  if(score >= 75) return 'Great';
+  if(score >= 50) return 'Good';
+  if(score >= 25) return 'Okay';
+  if(score >= 10) return 'Bad';
+  return 'Terrible';
+}
+
+function renderPredictorCard(row){
+  const position = row.position;
+  const name = row.player_display_name || row.draft_pfr_player_name || '(unnamed)';
+  const composite = compositeScore(row, position);
+  const tier = composite != null ? tierForComposite(composite) : null;
+
+  const hasActuals = row.games > 0 && row.ceiling_season_rank != null;
+  const noteHtml = hasActuals
+    ? ''
+    : `<div class="predictor-note">No career data yet (rookie or hasn't reached the field) — showing model predictions only, based on draft profile.</div>`;
+
+  const rows = PREDICT_TARGETS.map(t => {
+    const pred = runModel(row, position, t);
+    let actual = null;
+    if(t === 'ceiling_inv' && row.ceiling_season_rank != null) actual = -row.ceiling_season_rank;
+    if(t === 'peak3_ratio' && row.peak3_ratio != null) actual = row.peak3_ratio;
+    if(t === 'career_pts' && row.career_pts != null) actual = row.career_pts;
+    if(t === 'top12_rate' && row.top12_rate != null) actual = row.top12_rate;
+    const fmt = v => {
+      if(v == null) return '—';
+      if(t === 'ceiling_inv') return `Rank #${Math.max(1, Math.round(-v))}`; // internally stored as -rank; show as a readable rank
+      return Math.abs(v) < 5 ? v.toFixed(2) : Math.round(v).toLocaleString('en-US');
+    };
+    return `<tr>
+      <td>${PREDICT_LABELS[t]}</td>
+      <td class="num predicted">${fmt(pred)}</td>
+      <td class="num actual">${fmt(actual)}</td>
+    </tr>`;
+  }).join('');
+
+  const preds = predictModel.predictors;
+  const eff = effectiveRow(row);
+  const inputsHtml = preds.map(p => {
+    let v = eff[p];
+    const missing = (v == null || v === '' || isNaN(v));
+    const label = p.replace('draft_','').replace('combine_','').replace('final_','').replace('_',' ');
+    if(missing){
+      return `<div class="pi missing">
+        <span class="lbl">${label}:</span> n/a (imputed)
+        <div class="override-row">
+          <input type="text" placeholder="real value" data-override-field="${p}">
+          <button data-override-apply="${p}">Set</button>
+        </div>
+      </div>`;
+    }
+    return `<div class="pi"><span class="lbl">${label}:</span> ${v}</div>`;
+  }).join('');
+
+  document.getElementById('predictorCard').innerHTML = `
+    <div class="predictor-card">
+      <div class="phead">
+        <div>
+          <div class="pname">${name}</div>
+          <div class="psub">${position} · drafted ${row.draft_season || '?'} · round ${row.draft_round || '?'}, pick ${row.draft_pick || '?'}</div>
+        </div>
+        ${composite != null ? `<div class="composite-box"><div class="score">${Math.round(composite)}</div><div class="tier">${tier}</div></div>` : ''}
+      </div>
+      ${noteHtml}
+      <table class="predict-table">
+        <thead><tr><th>Target</th><th style="text-align:right;">Predicted</th><th style="text-align:right;">Actual</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="uncertainty-note">
+        These predictors explain roughly 10-40% of what actually happens to a player's career (R² varies by position/target) — real signal, but far from certain. Composite scores within about 10 points of each other are within the model's noise floor and shouldn't be read as a confident ranking between those two players specifically.
+      </div>
+      <div class="section-label" style="margin-top:16px;">Inputs used</div>
+      <div class="predictor-inputs">${inputsHtml}</div>
+    </div>
+  `;
+
+  document.querySelectorAll('[data-override-apply]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = btn.dataset.overrideApply;
+      const input = document.querySelector(`[data-override-field="${field}"]`);
+      const val = parseFloat(input.value);
+      if(isNaN(val)){ input.style.borderColor = 'var(--alert)'; return; }
+      setOverride(row.player_id, field, val);
+      renderPredictorCard(row); // re-render with the override applied
+    });
+  });
+}
+
+document.getElementById('predictorSearch').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  const resultsEl = document.getElementById('predictorResults');
+  if(!researchDB){ return; }
+  if(q.length < 2){ resultsEl.innerHTML = ''; return; }
+  const matches = researchDB.filter(r => {
+    const name = (r.player_display_name || r.draft_pfr_player_name || '').toLowerCase();
+    return name.includes(q);
+  }).slice(0, 8);
+  resultsEl.innerHTML = matches.map((r, i) => {
+    const name = r.player_display_name || r.draft_pfr_player_name || '(unnamed)';
+    return `<div class="predictor-result-row" data-idx="${researchDB.indexOf(r)}">
+      ${name}<div class="sub">${r.position} · drafted ${r.draft_season || '?'} · ${r.draft_team || ''}</div>
+    </div>`;
+  }).join('') || '<div class="empty">No matches</div>';
+
+  resultsEl.querySelectorAll('.predictor-result-row').forEach(el => {
+    el.addEventListener('click', () => {
+      const row = researchDB[parseInt(el.dataset.idx)];
+      renderPredictorCard(row);
+    });
+  });
+});
+
+// ---- Search vs Year-leaderboard mode ----
+document.getElementById('predModeSearch').addEventListener('click', () => switchPredMode('search'));
+document.getElementById('predModeYear').addEventListener('click', () => switchPredMode('year'));
+
+function switchPredMode(mode){
+  document.getElementById('predModeSearch').classList.toggle('active', mode==='search');
+  document.getElementById('predModeYear').classList.toggle('active', mode==='year');
+  document.getElementById('predSearchMode').style.display = mode==='search' ? '' : 'none';
+  document.getElementById('predYearMode').style.display = mode==='year' ? '' : 'none';
+  if(mode === 'year') buildYearSelect();
+}
+
+function buildYearSelect(){
+  if(!researchDB) return;
+  const sel = document.getElementById('yearSelect');
+  if(sel.options.length) return; // already built
+  const years = [...new Set(researchDB.map(r => r.draft_season).filter(y => y != null))].sort((a,b) => b-a);
+  sel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+  sel.addEventListener('change', renderYearLeaderboard);
+  renderYearLeaderboard();
+}
+
+function renderYearLeaderboard(){
+  const year = parseFloat(document.getElementById('yearSelect').value);
+  const classPlayers = researchDB.filter(r => r.draft_season === year);
+  const scored = classPlayers.map(r => ({row: r, score: compositeScore(r, r.position)}))
+    .filter(x => x.score != null)
+    .sort((a,b) => b.score - a.score);
+
+  document.getElementById('yearLeaderboard').innerHTML = scored.map((x, i) => {
+    const name = x.row.player_display_name || x.row.draft_pfr_player_name || '(unnamed)';
+    return `<div class="yr-row" data-idx="${researchDB.indexOf(x.row)}">
+      <span class="rk">${i+1}</span>
+      <span>${name}</span>
+      <span>${x.row.position}</span>
+      <span style="color:var(--muted);font-size:11px;">Rd ${x.row.draft_round || '?'}, Pk ${x.row.draft_pick || '?'}</span>
+      <span class="sc">${Math.round(x.score)}</span>
+    </div>`;
+  }).join('') || '<div class="empty">No scoreable players for this year</div>';
+
+  document.querySelectorAll('.yr-row').forEach(el => {
+    el.addEventListener('click', () => {
+      const row = researchDB[parseInt(el.dataset.idx)];
+      renderPredictorCard(row);
+      window.scrollTo({top: document.getElementById('predictorCard').offsetTop - 20, behavior:'smooth'});
+    });
+  });
+}
+// Multi-league profiles, stored in real browser localStorage (window.storage only exists
+// inside Claude's own chat UI — on a real hosted page like this one it doesn't exist at all,
+// which is why the old "remember my inputs" feature never actually worked once deployed here).
+const LEAGUES_KEY = 'ffb-saved-leagues';
+
+function getSavedLeagues(){
+  try{
+    return JSON.parse(localStorage.getItem(LEAGUES_KEY) || '[]');
+  }catch(e){ return []; }
+}
+function setSavedLeagues(list){
+  try{ localStorage.setItem(LEAGUES_KEY, JSON.stringify(list)); }catch(e){ /* storage unavailable, fail soft */ }
+}
+
+function renderLeagueSelect(){
+  const leagues = getSavedLeagues();
+  const sel = document.getElementById('leagueSelect');
+  if(!leagues.length){
+    sel.style.display = 'none';
+    return;
+  }
+  sel.style.display = 'inline-block';
+  sel.innerHTML = `<option value="">— saved leagues —</option>` +
+    leagues.map((l,i) => `<option value="${i}">${l.label}</option>`).join('');
+}
+
+document.getElementById('leagueSelect').addEventListener('change', (e) => {
+  const idx = e.target.value;
+  if(idx === '') return;
+  const l = getSavedLeagues()[parseInt(idx)];
+  if(!l) return;
+  document.getElementById('usernameInput').value = l.username;
+  document.getElementById('leagueIdInput').value = l.leagueId;
+  document.getElementById('leagueLabelInput').value = l.label;
+  localStorage.setItem('ffb-last-selected', idx);
+  pullLatest();
+});
+
+document.getElementById('saveLeagueBtn').addEventListener('click', () => {
+  const username = document.getElementById('usernameInput').value.trim();
+  const leagueId = document.getElementById('leagueIdInput').value.trim();
+  const label = document.getElementById('leagueLabelInput').value.trim();
+  if(!username || !leagueId || !label){
+    showError('Fill in username, league ID, and a label before saving.');
+    return;
+  }
+  const leagues = getSavedLeagues();
+  const existingIdx = leagues.findIndex(l => l.username === username && l.leagueId === leagueId);
+  if(existingIdx >= 0) leagues[existingIdx] = {username, leagueId, label};
+  else leagues.push({username, leagueId, label});
+  setSavedLeagues(leagues);
+  renderLeagueSelect();
+  setStatus(`Saved "${label}"`);
+});
+renderFilters();
+
+document.getElementById('fetchBtn').addEventListener('click', pullLatest);
+renderFilters();
+renderLeagueSelect();
+
+// On load: fields start genuinely empty (no hardcoded personal defaults). If a league was
+// previously used on this browser, restore that selection — but never auto-pull, since a
+// friend opening this same page for the first time should see a clean, empty state.
+(function init(){
+  const leagues = getSavedLeagues();
+  const lastIdx = localStorage.getItem('ffb-last-selected');
+  if(leagues.length && lastIdx !== null && leagues[parseInt(lastIdx)]){
+    const l = leagues[parseInt(lastIdx)];
+    document.getElementById('usernameInput').value = l.username;
+    document.getElementById('leagueIdInput').value = l.leagueId;
+    document.getElementById('leagueLabelInput').value = l.label;
+    document.getElementById('leagueSelect').value = lastIdx;
+  }
+})();
+</script>
+</body>
+</html>
