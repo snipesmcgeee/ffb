@@ -88,6 +88,15 @@
     font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
     font-size:13px;
   }
+  select{
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--chalk);
+    padding:8px 10px;
+    border-radius:3px;
+    font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;
+    font-size:13px;
+  }
   button{
     background:var(--accent);
     color:#052420;
@@ -318,6 +327,39 @@
     padding-top:6px;
     margin:2px 0 6px 0;
   }
+  .yr-row{
+    display:grid;
+    grid-template-columns:30px 1fr 60px 90px 60px;
+    align-items:center;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:8px 12px;
+    margin-bottom:5px;
+    font-size:13px;
+    cursor:pointer;
+    gap:8px;
+  }
+  .yr-row:hover{border-color:var(--accent);}
+  .yr-row .rk{color:var(--muted);font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;}
+  .yr-row .sc{font-weight:800;color:var(--accent);text-align:right;font-family:'Consolas','SFMono-Regular',ui-monospace,monospace;}
+  .uncertainty-note{
+    font-size:11px;
+    color:var(--muted);
+    background:var(--surface-raised);
+    border-left:3px solid var(--gold, #C9A227);
+    padding:8px 12px;
+    margin-top:10px;
+    border-radius:0 3px 3px 0;
+  }
+  .override-row{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    margin-top:6px;
+  }
+  .override-row input{width:80px;padding:4px 6px;font-size:11px;}
+  .override-row button{padding:4px 10px;font-size:10px;}
   .error-box{
     background:rgba(229,72,77,0.12);
     border:1px solid var(--alert);
@@ -332,7 +374,7 @@
 </head>
 <body>
 
-<div class="version-tag">v0.5</div>
+<div class="version-tag">v0.6</div>
 
 <div class="scorebug">
   <div>
@@ -343,10 +385,13 @@
 </div>
 
 <div class="controls">
-  <input type="text" id="usernameInput" value="jaheruth2412" placeholder="Sleeper username">
-  <input type="text" id="leagueIdInput" value="1328961362654691328" placeholder="League ID" style="width:220px;">
+  <select id="leagueSelect" style="display:none;"></select>
+  <input type="text" id="usernameInput" placeholder="Sleeper username">
+  <input type="text" id="leagueIdInput" placeholder="League ID" style="width:220px;">
+  <input type="text" id="leagueLabelInput" placeholder="Label (e.g. Main Dynasty)" style="width:160px;">
+  <button id="saveLeagueBtn" style="background:var(--surface);color:var(--chalk);border:1px solid var(--line);">Save League</button>
   <button id="fetchBtn">Pull latest</button>
-  <span class="status" id="statusLine">enter your info and hit pull latest</span>
+  <span class="status" id="statusLine">enter league info and pull latest, or pick a saved league above</span>
 </div>
 
 <div id="errorBox"></div>
@@ -371,8 +416,21 @@
 
 <div class="view-panel" id="view-predictor">
   <div class="predictor-wrap">
-    <input type="text" class="predictor-search" id="predictorSearch" placeholder="Search any player, 1999-present, or a 2026 rookie...">
-    <div class="predictor-results" id="predictorResults"></div>
+    <div class="value-filters" style="margin-bottom:14px;">
+      <div class="value-filter active" data-predmode="search" id="predModeSearch">Search Player</div>
+      <div class="value-filter" data-predmode="year" id="predModeYear">Browse by Draft Year</div>
+    </div>
+
+    <div id="predSearchMode">
+      <input type="text" class="predictor-search" id="predictorSearch" placeholder="Search any player, 1999-present, or a 2026 rookie...">
+      <div class="predictor-results" id="predictorResults"></div>
+    </div>
+
+    <div id="predYearMode" style="display:none;">
+      <select id="yearSelect" style="margin-bottom:14px;"></select>
+      <div id="yearLeaderboard"></div>
+    </div>
+
     <div id="predictorCard"></div>
   </div>
 </div>
@@ -620,7 +678,7 @@ function valueHtml(id, valuesMap, projMap, isHalfPpr, projLabel, filter){
   return html;
 }
 
-const POSITIONS = ['QB','RB','WR','FLEX','TE','K','DEF'];
+const POSITIONS = ['QB','RB','WR','FLEX','TE'];
 const FLEX_ELIGIBLE = ['RB','WR','TE'];
 
 function ownershipOf(playerId, myIds, rosteredIds){
@@ -668,7 +726,7 @@ function renderBoard(){
     if(kind === 'fa' && !p.team) return;
     if(kind === 'fa' && !['Active'].includes(p.status) && p.position !== 'DEF') return;
 
-    if(p.position === 'QB' || p.position === 'RB' || p.position === 'WR' || p.position === 'TE' || p.position === 'K' || p.position === 'DEF'){
+    if(p.position === 'QB' || p.position === 'RB' || p.position === 'WR' || p.position === 'TE'){
       pools[p.position].push({p, kind});
     }
     if(FLEX_ELIGIBLE.includes(p.position)){
@@ -820,9 +878,9 @@ async function pullLatest(){
     renderFilters();
     renderBoard();
 
-    try{
-      await window.storage.set('last-inputs', JSON.stringify({username, leagueId}), false);
-    }catch(e){ /* best-effort */ }
+    // no separate save-on-pull needed — saving a league is an explicit action (Save League
+    // button) now, not an implicit side effect of every pull, since profiles are shared
+    // across multiple leagues/people using this same page
 
     const warnings = [];
     if(!projMap) warnings.push('weekly projections unavailable');
@@ -860,11 +918,24 @@ async function loadResearchDataOnce(){
   }
 }
 
-function predictorHtInches(s){
-  if(!s) return null;
-  const parts = String(s).split('-');
-  if(parts.length !== 2) return null;
-  return parseInt(parts[0])*12 + parseInt(parts[1]);
+// Manual overrides for missing predictor values, keyed by player_id, persisted so they
+// survive a page reload. This exists because some legitimate data gaps (a rookie who
+// skipped the combine, nflverse not having caught up yet) shouldn't force imputation
+// forever if you actually know the real number.
+const OVERRIDES_KEY = 'ffb-predictor-overrides';
+function getOverrides(){
+  try{ return JSON.parse(localStorage.getItem(OVERRIDES_KEY) || '{}'); }catch(e){ return {}; }
+}
+function setOverride(playerId, field, value){
+  const o = getOverrides();
+  if(!o[playerId]) o[playerId] = {};
+  o[playerId][field] = value;
+  try{ localStorage.setItem(OVERRIDES_KEY, JSON.stringify(o)); }catch(e){ /* fail soft */ }
+}
+function effectiveRow(row){
+  const o = getOverrides()[row.player_id];
+  if(!o) return row;
+  return Object.assign({}, row, o);
 }
 
 // Apply the stored regression: impute missing predictors with training-set means,
@@ -872,9 +943,10 @@ function predictorHtInches(s){
 function runModel(row, position, target){
   const m = predictModel.models[position] && predictModel.models[position][target];
   if(!m) return null;
+  row = effectiveRow(row);
   const preds = predictModel.predictors;
   const x = preds.map((p, i) => {
-    let v = p === 'combine_ht_in' ? predictorHtInches(row['combine_ht']) : row[p];
+    let v = row[p];
     if(v == null || v === '' || isNaN(v)) v = m.impute_mean[i];
     return v;
   });
@@ -944,11 +1016,21 @@ function renderPredictorCard(row){
   }).join('');
 
   const preds = predictModel.predictors;
+  const eff = effectiveRow(row);
   const inputsHtml = preds.map(p => {
-    let v = p === 'combine_ht_in' ? row['combine_ht'] : row[p];
-    const missing = (v == null || v === '');
-    const label = p.replace('draft_','').replace('combine_','').replace('_',' ');
-    return `<div class="pi ${missing?'missing':''}"><span class="lbl">${label}:</span> ${missing ? 'n/a (imputed)' : v}</div>`;
+    let v = eff[p];
+    const missing = (v == null || v === '' || isNaN(v));
+    const label = p.replace('draft_','').replace('combine_','').replace('final_','').replace('_',' ');
+    if(missing){
+      return `<div class="pi missing">
+        <span class="lbl">${label}:</span> n/a (imputed)
+        <div class="override-row">
+          <input type="text" placeholder="real value" data-override-field="${p}">
+          <button data-override-apply="${p}">Set</button>
+        </div>
+      </div>`;
+    }
+    return `<div class="pi"><span class="lbl">${label}:</span> ${v}</div>`;
   }).join('');
 
   document.getElementById('predictorCard').innerHTML = `
@@ -965,10 +1047,24 @@ function renderPredictorCard(row){
         <thead><tr><th>Target</th><th style="text-align:right;">Predicted</th><th style="text-align:right;">Actual</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div class="section-label" style="margin-top:0;">Inputs used</div>
+      <div class="uncertainty-note">
+        These predictors explain roughly 10-40% of what actually happens to a player's career (R² varies by position/target) — real signal, but far from certain. Composite scores within about 10 points of each other are within the model's noise floor and shouldn't be read as a confident ranking between those two players specifically.
+      </div>
+      <div class="section-label" style="margin-top:16px;">Inputs used</div>
       <div class="predictor-inputs">${inputsHtml}</div>
     </div>
   `;
+
+  document.querySelectorAll('[data-override-apply]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = btn.dataset.overrideApply;
+      const input = document.querySelector(`[data-override-field="${field}"]`);
+      const val = parseFloat(input.value);
+      if(isNaN(val)){ input.style.borderColor = 'var(--alert)'; return; }
+      setOverride(row.player_id, field, val);
+      renderPredictorCard(row); // re-render with the override applied
+    });
+  });
 }
 
 document.getElementById('predictorSearch').addEventListener('input', (e) => {
@@ -995,19 +1091,127 @@ document.getElementById('predictorSearch').addEventListener('input', (e) => {
   });
 });
 
-document.getElementById('fetchBtn').addEventListener('click', pullLatest);
+// ---- Search vs Year-leaderboard mode ----
+document.getElementById('predModeSearch').addEventListener('click', () => switchPredMode('search'));
+document.getElementById('predModeYear').addEventListener('click', () => switchPredMode('year'));
+
+function switchPredMode(mode){
+  document.getElementById('predModeSearch').classList.toggle('active', mode==='search');
+  document.getElementById('predModeYear').classList.toggle('active', mode==='year');
+  document.getElementById('predSearchMode').style.display = mode==='search' ? '' : 'none';
+  document.getElementById('predYearMode').style.display = mode==='year' ? '' : 'none';
+  if(mode === 'year') buildYearSelect();
+}
+
+function buildYearSelect(){
+  if(!researchDB) return;
+  const sel = document.getElementById('yearSelect');
+  if(sel.options.length) return; // already built
+  const years = [...new Set(researchDB.map(r => r.draft_season).filter(y => y != null))].sort((a,b) => b-a);
+  sel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+  sel.addEventListener('change', renderYearLeaderboard);
+  renderYearLeaderboard();
+}
+
+function renderYearLeaderboard(){
+  const year = parseFloat(document.getElementById('yearSelect').value);
+  const classPlayers = researchDB.filter(r => r.draft_season === year);
+  const scored = classPlayers.map(r => ({row: r, score: compositeScore(r, r.position)}))
+    .filter(x => x.score != null)
+    .sort((a,b) => b.score - a.score);
+
+  document.getElementById('yearLeaderboard').innerHTML = scored.map((x, i) => {
+    const name = x.row.player_display_name || x.row.draft_pfr_player_name || '(unnamed)';
+    return `<div class="yr-row" data-idx="${researchDB.indexOf(x.row)}">
+      <span class="rk">${i+1}</span>
+      <span>${name}</span>
+      <span>${x.row.position}</span>
+      <span style="color:var(--muted);font-size:11px;">Rd ${x.row.draft_round || '?'}, Pk ${x.row.draft_pick || '?'}</span>
+      <span class="sc">${Math.round(x.score)}</span>
+    </div>`;
+  }).join('') || '<div class="empty">No scoreable players for this year</div>';
+
+  document.querySelectorAll('.yr-row').forEach(el => {
+    el.addEventListener('click', () => {
+      const row = researchDB[parseInt(el.dataset.idx)];
+      renderPredictorCard(row);
+      window.scrollTo({top: document.getElementById('predictorCard').offsetTop - 20, behavior:'smooth'});
+    });
+  });
+}
+// Multi-league profiles, stored in real browser localStorage (window.storage only exists
+// inside Claude's own chat UI — on a real hosted page like this one it doesn't exist at all,
+// which is why the old "remember my inputs" feature never actually worked once deployed here).
+const LEAGUES_KEY = 'ffb-saved-leagues';
+
+function getSavedLeagues(){
+  try{
+    return JSON.parse(localStorage.getItem(LEAGUES_KEY) || '[]');
+  }catch(e){ return []; }
+}
+function setSavedLeagues(list){
+  try{ localStorage.setItem(LEAGUES_KEY, JSON.stringify(list)); }catch(e){ /* storage unavailable, fail soft */ }
+}
+
+function renderLeagueSelect(){
+  const leagues = getSavedLeagues();
+  const sel = document.getElementById('leagueSelect');
+  if(!leagues.length){
+    sel.style.display = 'none';
+    return;
+  }
+  sel.style.display = 'inline-block';
+  sel.innerHTML = `<option value="">— saved leagues —</option>` +
+    leagues.map((l,i) => `<option value="${i}">${l.label}</option>`).join('');
+}
+
+document.getElementById('leagueSelect').addEventListener('change', (e) => {
+  const idx = e.target.value;
+  if(idx === '') return;
+  const l = getSavedLeagues()[parseInt(idx)];
+  if(!l) return;
+  document.getElementById('usernameInput').value = l.username;
+  document.getElementById('leagueIdInput').value = l.leagueId;
+  document.getElementById('leagueLabelInput').value = l.label;
+  localStorage.setItem('ffb-last-selected', idx);
+  pullLatest();
+});
+
+document.getElementById('saveLeagueBtn').addEventListener('click', () => {
+  const username = document.getElementById('usernameInput').value.trim();
+  const leagueId = document.getElementById('leagueIdInput').value.trim();
+  const label = document.getElementById('leagueLabelInput').value.trim();
+  if(!username || !leagueId || !label){
+    showError('Fill in username, league ID, and a label before saving.');
+    return;
+  }
+  const leagues = getSavedLeagues();
+  const existingIdx = leagues.findIndex(l => l.username === username && l.leagueId === leagueId);
+  if(existingIdx >= 0) leagues[existingIdx] = {username, leagueId, label};
+  else leagues.push({username, leagueId, label});
+  setSavedLeagues(leagues);
+  renderLeagueSelect();
+  setStatus(`Saved "${label}"`);
+});
 renderFilters();
 
-(async function init(){
-  try{
-    const saved = await window.storage.get('last-inputs', false);
-    if(saved && saved.value){
-      const {username, leagueId} = JSON.parse(saved.value);
-      if(username) document.getElementById('usernameInput').value = username;
-      if(leagueId) document.getElementById('leagueIdInput').value = leagueId;
-    }
-  }catch(e){ /* no saved state yet, fine */ }
-  pullLatest();
+document.getElementById('fetchBtn').addEventListener('click', pullLatest);
+renderFilters();
+renderLeagueSelect();
+
+// On load: fields start genuinely empty (no hardcoded personal defaults). If a league was
+// previously used on this browser, restore that selection — but never auto-pull, since a
+// friend opening this same page for the first time should see a clean, empty state.
+(function init(){
+  const leagues = getSavedLeagues();
+  const lastIdx = localStorage.getItem('ffb-last-selected');
+  if(leagues.length && lastIdx !== null && leagues[parseInt(lastIdx)]){
+    const l = leagues[parseInt(lastIdx)];
+    document.getElementById('usernameInput').value = l.username;
+    document.getElementById('leagueIdInput').value = l.leagueId;
+    document.getElementById('leagueLabelInput').value = l.label;
+    document.getElementById('leagueSelect').value = lastIdx;
+  }
 })();
 </script>
 </body>
